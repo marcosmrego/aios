@@ -138,6 +138,16 @@ class DeployCallbackRequest(BaseModel):
     sprint: str = ""
 
 
+@app.post("/devops/deploy-aios")
+async def deploy_aios(background_tasks: BackgroundTasks) -> dict:
+    """
+    Triggered by N8N on push to main branch.
+    DevOps Agent redeploys the AIOS API and Watcher on Coolify.
+    """
+    background_tasks.add_task(_run_in_thread, _do_deploy_aios)
+    return {"status": "triggered", "action": "deploy_aios"}
+
+
 @app.post("/devops/deploy-callback")
 async def deploy_callback(req: DeployCallbackRequest) -> dict:
     """
@@ -210,3 +220,45 @@ def _do_expansao_pipeline(context: str, start_from: str) -> None:
 def _do_ceo(context: str) -> None:
     from orchestrator.agents.ceo_agent import CEOAgent  # noqa: PLC0415
     CEOAgent().run(extra_context=context)
+
+
+def _do_deploy_aios() -> None:
+    """DevOps Agent deploys AIOS API + Watcher to Coolify."""
+    import httpx  # noqa: PLC0415
+    from orchestrator.settings import settings  # noqa: PLC0415
+    from tools.slack import post_slack_message  # noqa: PLC0415
+    import logging  # noqa: PLC0415
+
+    log = logging.getLogger("aios.devops")
+
+    if not settings.coolify_api_key or not settings.coolify_base_url:
+        log.warning("Coolify not configured — skipping deploy")
+        return
+
+    headers = {
+        "Authorization": f"Bearer {settings.coolify_api_key}",
+        "Content-Type": "application/json",
+    }
+    base = settings.coolify_base_url.rstrip("/")
+
+    deployments = [
+        ("aios API",     "nuq78y0fxb3toq3kdun7rb3u"),
+        ("aios Watcher", "soox30s56xbhg0794ncwgkj4"),
+    ]
+
+    results = []
+    for name, uuid in deployments:
+        try:
+            r = httpx.post(f"{base}/api/v1/deploy?uuid={uuid}&force=false",
+                           headers=headers, timeout=30)
+            r.raise_for_status()
+            dep = r.json().get("deployments", [{}])[0]
+            results.append(f"[OK] {name} → {dep.get('deployment_uuid','?')[:12]}")
+        except Exception as e:
+            results.append(f"[FAIL] {name}: {e}")
+
+    summary = "\n".join(results)
+    log.info(f"AIOS deploy triggered:\n{summary}")
+
+    if settings.slack_webhook_url:
+        post_slack_message(f"[DEVOPS] *Deploy AIOS disparado*\n{summary}")
