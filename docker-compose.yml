@@ -9,6 +9,8 @@ services:
       - aios_outputs:/app/outputs
       - aios_inputs:/app/inputs
     restart: unless-stopped
+    networks:
+      - coolify
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -28,3 +30,7 @@ services:
 volumes:
   aios_outputs:
   aios_inputs:
+
+networks:
+  coolify:
+    external: true
