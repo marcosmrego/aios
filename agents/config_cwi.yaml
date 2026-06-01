@@ -1,0 +1,117 @@
+agents:
+  meeting_secretary:
+    name: "Meeting Secretary Agent"
+    role: "Secretario de Reuniao"
+    model: "${SECRETARY_MODEL:-claude-sonnet-4-6}"
+    max_tokens: 8192
+    prompt_file: "agents/prompts_cwi/meeting_secretary.md"
+    inputs:
+      - type: file
+        path: "inputs/cwi/transcricao*.txt"
+    outputs:
+      - type: notion
+        database: "${CWI_MEETINGS_DB_ID}"
+      - type: slack
+        message_prefix: "[REUNIAO]"
+    human_approval_required: false
+    triggers:
+      - manual
+
+  pmo:
+    name: "PMO Agent"
+    role: "Project Management Officer"
+    model: "${PMO_MODEL:-claude-sonnet-4-6}"
+    max_tokens: 8192
+    prompt_file: "agents/prompts_cwi/pmo.md"
+    inputs:
+      - type: notion
+        database: "${CWI_MEETINGS_DB_ID}"
+      - type: file
+        path: "inputs/cwi/indicadores*.txt"
+    outputs:
+      - type: notion
+        database: "${CWI_REPORTS_DB_ID}"
+      - type: slack
+        message_prefix: "[PMO]"
+    human_approval_required: false
+    triggers:
+      - after: meeting_secretary
+      - manual
+
+  agile_coach:
+    name: "Agile Coach Agent"
+    role: "Agile Coach"
+    model: "${AGILE_COACH_MODEL:-claude-sonnet-4-6}"
+    max_tokens: 4096
+    prompt_file: "agents/prompts_cwi/agile_coach.md"
+    inputs:
+      - type: file
+        path: "inputs/cwi/metricas*.txt"
+    outputs:
+      - type: notion
+        database: "${CWI_REPORTS_DB_ID}"
+      - type: slack
+        message_prefix: "[AGILE]"
+    human_approval_required: false
+    triggers:
+      - manual
+
+  product:
+    name: "Product Agent"
+    role: "Product Manager CWI"
+    model: "${PRODUCT_MODEL:-claude-sonnet-4-6}"
+    max_tokens: 8192
+    prompt_file: "agents/prompts_cwi/product.md"
+    inputs:
+      - type: file
+        path: "inputs/cwi/demandas*.txt"
+    outputs:
+      - type: notion
+        database: "${CWI_BACKLOG_DB_ID}"
+      - type: slack
+        message_prefix: "[PRODUTO]"
+    human_approval_required: true
+    approval_gate: "product->backlog"
+    triggers:
+      - manual
+
+  executive_reporting:
+    name: "Executive Reporting Agent"
+    role: "Analista de Relatorios Executivos"
+    model: "${EXEC_REPORT_MODEL:-claude-sonnet-4-6}"
+    max_tokens: 8192
+    prompt_file: "agents/prompts_cwi/executive_reporting.md"
+    inputs:
+      - type: notion
+        database: "${CWI_REPORTS_DB_ID}"
+    outputs:
+      - type: notion
+        database: "${CWI_REPORTS_DB_ID}"
+      - type: slack
+        message_prefix: "[EXEC]"
+    human_approval_required: true
+    approval_gate: "exec->publish"
+    triggers:
+      - manual
+
+pipeline:
+  default_flow:
+    - meeting_secretary
+    - pmo
+    - agile_coach
+    - product
+    - executive_reporting
+
+  human_gates:
+    - id: "product->backlog"
+      description: "Revisao das historias antes de entrar no backlog"
+      timeout_hours: 24
+    - id: "exec->publish"
+      description: "Revisao do relatorio executivo antes de enviar para diretoria"
+      timeout_hours: 12
+
+context:
+  shared_source: notion
+  persistence: true
+  output_dir: "outputs/cwi/"
+  input_dir: "inputs/cwi/"

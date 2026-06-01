@@ -1,0 +1,20 @@
+services:
+  aios:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - aios_outputs:/app/outputs
+      - aios_inputs:/app/inputs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  aios_outputs:
+  aios_inputs:

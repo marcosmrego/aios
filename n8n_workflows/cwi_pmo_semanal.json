@@ -1,0 +1,37 @@
+{
+  "name": "CWI — PMO Semanal Sexta 17h",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 17 * * 5" }]
+        }
+      },
+      "name": "Schedule Sexta 17h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AIOS_API_URL }}/cwi/pmo",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "days", "value": 7 }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      },
+      "name": "Trigger PMO",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [460, 300]
+    }
+  ],
+  "connections": {
+    "Schedule Sexta 17h": {
+      "main": [[{ "node": "Trigger PMO", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "CWI — Digest Diario 08h",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 8 * * 1-5" }]
+        }
+      },
+      "name": "Schedule 08h (seg-sex)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AIOS_API_URL }}/cwi/digest",
+        "options": { "timeout": 10000 }
+      },
+      "name": "Trigger Digest",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [460, 300]
+    }
+  ],
+  "connections": {
+    "Schedule 08h (seg-sex)": {
+      "main": [[{ "node": "Trigger Digest", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "_comment": "Define a variavel de ambiente AIOS_API_URL no N8N com a URL publica da API (ex: https://aios.seudominio.com)"
+}

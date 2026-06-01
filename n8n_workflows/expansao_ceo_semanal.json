@@ -1,0 +1,31 @@
+{
+  "name": "Expansao AI — CEO Agent Segunda 09h",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 9 * * 1" }]
+        }
+      },
+      "name": "Schedule Segunda 09h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AIOS_API_URL }}/expansao/ceo",
+        "options": { "timeout": 10000 }
+      },
+      "name": "Trigger CEO Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [460, 300]
+    }
+  ],
+  "connections": {
+    "Schedule Segunda 09h": {
+      "main": [[{ "node": "Trigger CEO Agent", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

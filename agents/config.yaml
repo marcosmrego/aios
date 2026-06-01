@@ -1,0 +1,138 @@
+agents:
+  ceo:
+    name: "CEO Agent"
+    role: "Chief Executive Officer"
+    model: "${CEO_MODEL:-claude-opus-4-8}"
+    max_tokens: 4096
+    prompt_file: "agents/prompts/ceo.md"
+    outputs:
+      - type: notion
+        database: "${NOTION_SPRINTS_DB_ID}"
+      - type: slack
+        message_prefix: "📋 *Plano Semanal CEO*"
+    human_approval_required: false
+    triggers:
+      - manual
+      - schedule: "0 9 * * 1"  # toda segunda às 9h
+
+  pm:
+    name: "PM Agent"
+    role: "Product Manager"
+    model: "${PM_MODEL:-claude-sonnet-4-6}"
+    max_tokens: 8192
+    prompt_file: "agents/prompts/pm.md"
+    outputs:
+      - type: notion
+        database: "${NOTION_PROJECTS_DB_ID}"
+      - type: slack
+        message_prefix: "📝 *PRD Criado*"
+    human_approval_required: true
+    approval_gate: "ceo→pm"
+    triggers:
+      - after: ceo
+
+  architect:
+    name: "Architect Agent"
+    role: "Software Architect"
+    model: "${ARCHITECT_MODEL:-claude-sonnet-4-6}"
+    max_tokens: 8192
+    prompt_file: "agents/prompts/architect.md"
+    outputs:
+      - type: notion
+        database: "${NOTION_PROJECTS_DB_ID}"
+    human_approval_required: false
+    triggers:
+      - after: pm
+
+  dev:
+    name: "Dev Agent"
+    role: "Software Developer"
+    model: "${DEV_MODEL:-claude-sonnet-4-6}"
+    max_tokens: 16384
+    prompt_file: "agents/prompts/dev.md"
+    outputs:
+      - type: file
+        path: "outputs/code/"
+      - type: notion
+        database: "${NOTION_PROJECTS_DB_ID}"
+    human_approval_required: false
+    integrations:
+      - claude_code: true
+    triggers:
+      - after: architect
+
+  devops:
+    name: "DevOps Agent"
+    role: "DevOps Engineer"
+    model: "${DEVOPS_MODEL:-claude-haiku-4-5-20251001}"
+    max_tokens: 4096
+    prompt_file: "agents/prompts/devops.md"
+    outputs:
+      - type: slack
+        message_prefix: "🚀 *Deploy Status*"
+    human_approval_required: false
+    integrations:
+      - n8n: true
+      - coolify: true
+    triggers:
+      - after: qa
+        condition: "qa_approved"
+
+  qa:
+    name: "QA Agent"
+    role: "Quality Assurance Engineer"
+    model: "${QA_MODEL:-claude-sonnet-4-6}"
+    max_tokens: 4096
+    prompt_file: "agents/prompts/qa.md"
+    outputs:
+      - type: notion
+        database: "${NOTION_PROJECTS_DB_ID}"
+      - type: slack
+        message_prefix: "✅ *QA Report*"
+    human_approval_required: true
+    approval_gate: "qa→deploy"
+    triggers:
+      - after: dev
+
+  marketing:
+    name: "Marketing Agent"
+    role: "Content Marketing Manager"
+    model: "${MARKETING_MODEL:-claude-haiku-4-5-20251001}"
+    max_tokens: 4096
+    prompt_file: "agents/prompts/marketing.md"
+    outputs:
+      - type: notion
+        database: "${NOTION_PROJECTS_DB_ID}"
+      - type: slack
+        message_prefix: "📣 *Conteúdo Criado*"
+    human_approval_required: true
+    approval_gate: "content→publish"
+    triggers:
+      - after: devops
+        condition: "deploy_success"
+
+pipeline:
+  default_flow:
+    - ceo
+    - pm
+    - architect
+    - dev
+    - qa
+    - devops
+    - marketing
+
+  human_gates:
+    - id: "ceo→pm"
+      description: "CEO aprova plano antes do PM escrever PRD"
+      timeout_hours: 24
+    - id: "qa→deploy"
+      description: "QA aprova antes do deploy para produção"
+      timeout_hours: 8
+    - id: "content→publish"
+      description: "Revisão humana do conteúdo de marketing"
+      timeout_hours: 48
+
+context:
+  shared_source: notion
+  persistence: true
+  output_dir: "outputs/"

@@ -1,0 +1,46 @@
+[project]
+name = "expansao-ai-os"
+version = "0.1.0"
+description = "Orquestrador multi-agente para projetos Expansão AI"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.40.0",
+    "notion-client>=2.2.1,<3.0",
+    "httpx>=0.27.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+    "python-dotenv>=1.0.1",
+    "rich>=13.7.1",
+    "typer>=0.12.3",
+    "pyyaml>=6.0.1",
+]
+
+[project.optional-dependencies]
+api = ["fastapi>=0.111.0", "uvicorn[standard]>=0.30.0"]
+dev = ["pytest>=8.2.0", "pytest-asyncio>=0.23.7", "ruff>=0.4.9", "mypy>=1.10.0"]
+
+[project.scripts]
+aios = "orchestrator.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["orchestrator", "tools"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
