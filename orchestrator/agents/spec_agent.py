@@ -94,6 +94,15 @@ class SpecAgent(BaseAgent):
 Contexto do projeto: {context}
 Pipeline: {pipeline}
 
+REGRAS DE CONCISAO (obrigatorio):
+- Maximo 3 casos de uso por item
+- Fluxo principal: maximo 6 passos
+- Maximo 1 fluxo alternativo por caso de uso, com maximo 3 passos
+- Maximo 5 regras de negocio
+- Maximo 3 requisitos nao funcionais
+- Maximo 5 itens no glossario
+- Campos de texto: maximo 2 frases cada
+
 ITEM:
 {json.dumps(item, ensure_ascii=False, indent=2)}
 
