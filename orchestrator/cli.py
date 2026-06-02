@@ -6,8 +6,8 @@ from rich.console import Console
 app = typer.Typer(name="aios", help="Expansao AI OS -- Multi-agent orchestrator")
 console = Console(legacy_windows=False)
 
-_AGENTS_EXPANSAO = ["ceo", "pm", "architect", "dev", "qa", "devops", "marketing", "all"]
-_AGENTS_CWI = ["meeting-secretary", "pmo", "agile-coach", "product", "executive-reporting", "presentation", "all"]
+_AGENTS_EXPANSAO = ["ceo", "pm", "architect", "dev", "qa", "devops", "marketing", "spec", "all"]
+_AGENTS_CWI = ["meeting-secretary", "pmo", "agile-coach", "product", "executive-reporting", "presentation", "spec", "all"]
 _PIPELINES = ["expansao", "cwi"]
 
 
@@ -46,6 +46,7 @@ def run(
         "qa": _run_qa,
         "devops": _run_devops,
         "marketing": _run_marketing,
+        "spec": lambda _: _run_spec(input_file),
     }
     agent_map[agent](context)
 
@@ -64,6 +65,7 @@ def _run_cwi_command(agent: str, context: str, start_from: str, input_file: str)
         "product": lambda: _run_product(input_file),
         "executive-reporting": lambda: _run_executive_reporting(context),
         "presentation": lambda: _run_presentation(input_file),
+        "spec": lambda: _run_spec(input_file),
     }
 
     if agent not in agent_map_cwi:
@@ -279,6 +281,11 @@ def _run_executive_reporting(context: str) -> None:
 def _run_presentation(input_file: str) -> None:
     from orchestrator.agents_cwi.presentation_agent import PresentationAgent  # noqa: PLC0415
     PresentationAgent().run(input_file=input_file)
+
+
+def _run_spec(input_file: str) -> None:
+    from orchestrator.agents.spec_agent import SpecAgent  # noqa: PLC0415
+    SpecAgent().run(input_file=input_file)
 
 
 @app.command()
