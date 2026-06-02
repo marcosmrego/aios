@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,7 @@ import anthropic
 from rich.console import Console
 
 from orchestrator.settings import settings
+from tools.usage_tracker import estimate_cost, log_run
 
 console = Console(legacy_windows=False)
 
@@ -21,6 +23,7 @@ class BaseAgent:
     role: str
     model: str
     prompt_file: str
+    pipeline: str = "expansao"
 
     def __init__(self) -> None:
         self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
@@ -35,13 +38,36 @@ class BaseAgent:
     def _run(self, user_message: str, max_tokens: int = 4096) -> str:
         """Send a message to Claude and return the text response."""
         console.print(f"[bold blue]>> {self.name}[/] thinking...", end=" ")
+        t0 = time.monotonic()
         response = self.client.messages.create(
             model=self.model,
             max_tokens=max_tokens,
             system=self._system_prompt,
             messages=[{"role": "user", "content": user_message}],
         )
+        duration_ms = int((time.monotonic() - t0) * 1000)
         console.print("[green]done[/]")
+
+        usage = response.usage
+        cost = estimate_cost(self.model, usage.input_tokens, usage.output_tokens)
+        console.print(
+            f"[dim]  tokens: {usage.input_tokens}↑ {usage.output_tokens}↓  "
+            f"cost: ${cost:.4f}[/]"
+        )
+        try:
+            log_run(
+                project=self.pipeline,  # pipeline doubles as project for AIOS agents
+                pipeline=self.pipeline,
+                agent_name=self.name,
+                model=self.model,
+                input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+                cost_usd=cost,
+                duration_ms=duration_ms,
+            )
+        except Exception:
+            pass  # tracking must never break agent execution
+
         return response.content[0].text  # type: ignore[union-attr]
 
     def _parse_json_output(self, text: str) -> dict[str, Any]:

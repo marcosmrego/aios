@@ -63,6 +63,56 @@ POST /api/v1/recurso:
 - Especifica padrões de código a seguir (baseado nos projetos Climate/GRC Flow)
 - Define critérios técnicos de done (testes obrigatórios, cobertura mínima)
 
+## Padrões estabelecidos (aplicar sempre)
+
+### Usage tracking em features com LLM
+
+Toda feature que faz chamadas ao Claude **deve** incluir tracking de uso. A arquitetura já está pronta:
+
+**Para novos agentes AIOS** (herdam de `BaseAgent`):
+- Nada a fazer — `BaseAgent._run()` já instrumenta automaticamente
+- Definir `pipeline = "expansao"` ou `pipeline = "cwi"` na classe
+
+**Para projetos Python externos** (Climate, novos projetos):
+```python
+# Adicionar ao serviço — após cada client.messages.create():
+import time, os, httpx
+_AIOS_URL = os.getenv("AIOS_API_URL", "")
+_AIOS_KEY = os.getenv("AIOS_TRACK_KEY", "")
+
+def _track_usage(agent_name, model, input_tokens, output_tokens, duration_ms):
+    if not _AIOS_URL:
+        return
+    try:
+        httpx.post(f"{_AIOS_URL.rstrip('/')}/track",
+            headers={"X-AIOS-Key": _AIOS_KEY} if _AIOS_KEY else {},
+            json={"project": "<nome>", "agent_name": agent_name, "model": model,
+                  "input_tokens": input_tokens, "output_tokens": output_tokens,
+                  "duration_ms": duration_ms},
+            timeout=5.0)
+    except Exception:
+        pass  # tracking nunca quebra o fluxo principal
+
+# Instrumentar a chamada:
+t0 = time.monotonic()
+response = client.messages.create(...)
+_track_usage("meu-agente", model, response.usage.input_tokens,
+             response.usage.output_tokens, int((time.monotonic() - t0) * 1000))
+```
+
+**Para projetos TypeScript** (GRC Flow, novos projetos):
+- Copiar `GRC Flow/backend/src/utils/aiosTracker.ts` para o novo projeto
+- Chamar `trackUsage(agentName, model, inputTokens, outputTokens, durationMs)`
+
+**Env vars obrigatórias** em qualquer projeto com LLM:
+- `AIOS_API_URL=https://aios.expansao-ai.com.br`
+- `AIOS_TRACK_KEY=<valor de TRACK_API_KEY do AIOS>`
+- Documentar no `.env.example` do projeto
+
+**Endpoints AIOS disponíveis:**
+- `POST /track` — registra uma chamada (usado pelos projetos)
+- `GET /usage/summary?days=N` — agrega custo por projeto/agente (usado pelo CEO/dashboard)
+
 ## Regras de operação
 
 1. **Nunca reinvente a roda** — verifique se o padrão já existe em Climate ou GRC Flow

@@ -24,6 +24,20 @@ Para cada User Story, verifica cada critério de aceite:
 - Tipos Python corretos (sem `Any` desnecessário)
 - Tratamento de erros nos edge cases do PM
 
+### 2b. Checklist obrigatório para features com chamadas ao Claude
+
+Para qualquer story que envolva `client.messages.create()` ou chamada LLM equivalente:
+
+| Critério | Severity se falhar |
+|---|---|
+| `_track_usage()` (Python) ou `trackUsage()` (TS) chamado após cada `messages.create()` | **major** |
+| Chamada de tracking dentro de `try/except` — nunca propaga exceção | **critical** |
+| `timeout` definido na chamada HTTP de tracking (≤ 5s) | **major** |
+| `AIOS_API_URL` e `AIOS_TRACK_KEY` documentados no `.env.example` | **minor** |
+| Para agentes AIOS: atributo `pipeline` definido na classe (`"expansao"` ou `"cwi"`) | **major** |
+
+FAIL em qualquer item **critical** = rejeição automática do PR.
+
 ### 3. Verificação de API (quando aplicável)
 Para cada contrato de API definido pelo Architect:
 - Valida que o endpoint existe e aceita o schema correto

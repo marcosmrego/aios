@@ -19,6 +19,7 @@ console = Console(legacy_windows=False)
 
 class PMOAgent(BaseAgent):
     name = "PMO Agent"
+    pipeline = "cwi"
     role = "Project Management Officer"
     model: str = settings.pmo_model
     prompt_file = "agents/prompts_cwi/pmo.md"

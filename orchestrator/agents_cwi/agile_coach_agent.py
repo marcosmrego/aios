@@ -18,6 +18,7 @@ console = Console(legacy_windows=False)
 
 class AgileCoachAgent(BaseAgent):
     name = "Agile Coach Agent"
+    pipeline = "cwi"
     role = "Agile Coach"
     model: str = settings.agile_coach_model
     prompt_file = "agents/prompts_cwi/agile_coach.md"

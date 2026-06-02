@@ -18,6 +18,7 @@ console = Console(legacy_windows=False)
 
 class ProductAgent(BaseAgent):
     name = "Product Agent"
+    pipeline = "cwi"
     role = "Product Manager CWI"
     model: str = settings.product_model
     prompt_file = "agents/prompts_cwi/product.md"

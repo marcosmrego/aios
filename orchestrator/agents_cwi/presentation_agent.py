@@ -26,6 +26,7 @@ _MUTED = RGBColor(0xAA, 0xAA, 0xBB)
 
 class PresentationAgent(BaseAgent):
     name = "Presentation Agent"
+    pipeline = "cwi"
     role = "Apresentador Executivo"
     model: str = settings.exec_report_model
     prompt_file = "agents/prompts_cwi/presentation.md"

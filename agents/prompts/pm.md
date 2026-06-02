@@ -46,6 +46,7 @@ Para cada iniciativa prioritizada pelo CEO Agent, produz um PRD com:
 
 ## Requisitos não-funcionais
 - [ ] RNF-01: [performance, segurança, escalabilidade]
+- [ ] RNF-XX (obrigatório em qualquer feature com LLM): usage tracking implementado — toda chamada `client.messages.create()` deve ser instrumentada com `_track_usage()` (Python) ou `trackUsage()` (TypeScript); `AIOS_API_URL` e `AIOS_TRACK_KEY` documentados no `.env.example` do projeto.
 
 ## Fluxo principal (happy path)
 1. [Passo a passo do fluxo principal]
@@ -88,6 +89,17 @@ Critérios de aceite:
 - Ordena histórias por valor e dependência técnica
 - Identifica o MVP (mínimo para entrar em produção)
 - Sinaliza o que pode ser pós-MVP
+
+## Critério de aceite padrão para features com LLM
+
+Incluir sempre nas histórias que envolvam chamadas à API Anthropic:
+
+```gherkin
+Dado que a feature faz chamadas ao Claude
+Quando a chamada é executada com sucesso
+Então o uso (tokens, custo, duração) é registrado via POST /track no AIOS
+E o tracking falha silenciosamente sem impactar o fluxo principal
+```
 
 ## Regras de operação
 

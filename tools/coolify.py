@@ -71,3 +71,50 @@ class CoolifyClient:
     def trigger_deploy(self, app_uuid: str) -> dict[str, Any]:
         """Trigger a deploy and return the deployment info."""
         return self.deploy_application(app_uuid)
+
+    def get_env_vars(self, app_uuid: str) -> list[dict[str, Any]]:
+        """Return all env vars for an application."""
+        resp = httpx.get(
+            f"{self.base_url}/api/v1/applications/{app_uuid}/envs",
+            headers=self.headers,
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def set_env_var(self, app_uuid: str, key: str, value: str) -> dict[str, Any]:
+        """Create or update an env var. Handles 409 (already exists) by PATCHing."""
+        payload = {"key": key, "value": value, "is_buildtime": True, "is_runtime": True}
+        resp = httpx.post(
+            f"{self.base_url}/api/v1/applications/{app_uuid}/envs",
+            headers=self.headers,
+            json=payload,
+            timeout=_TIMEOUT,
+        )
+        if resp.status_code == 409:
+            resp = httpx.patch(
+                f"{self.base_url}/api/v1/applications/{app_uuid}/envs",
+                headers=self.headers,
+                json=payload,
+                timeout=_TIMEOUT,
+            )
+        resp.raise_for_status()
+        return {"key": key, "status": resp.status_code}
+
+    def set_env_vars(self, app_uuid: str, env_vars: dict[str, str]) -> list[dict[str, Any]]:
+        """Create or update multiple env vars at once."""
+        return [self.set_env_var(app_uuid, k, v) for k, v in env_vars.items()]
+
+    def redeploy(self, app_uuid: str) -> dict[str, Any]:
+        """Trigger redeploy and return deployment UUID."""
+        resp = httpx.post(
+            f"{self.base_url}/api/v1/deploy?uuid={app_uuid}&force=false",
+            headers=self.headers,
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return {
+            "app_uuid": app_uuid,
+            "deployment_uuid": data.get("deployments", [{}])[0].get("deployment_uuid", ""),
+        }

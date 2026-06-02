@@ -23,6 +23,7 @@ _BASE_URL = "https://api.notion.com/v1"
 
 class MeetingSecretaryAgent(BaseAgent):
     name = "Meeting Secretary Agent"
+    pipeline = "cwi"
     role = "Secretario de Reuniao"
     model: str = settings.secretary_model
     prompt_file = "agents/prompts_cwi/meeting_secretary.md"

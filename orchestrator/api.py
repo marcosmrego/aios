@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -40,6 +40,68 @@ class PipelineRequest(BaseModel):
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
+
+
+# ── Usage tracking ────────────────────────────────────────────────────────────
+
+class TrackRequest(BaseModel):
+    project: str                  # billable entity: "climate", "grc-flow", "aios", "cwi"
+    agent_name: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+    pipeline: str = ""
+    duration_ms: int = 0
+
+
+@app.post("/track", status_code=201)
+def track(
+    req: TrackRequest,
+    x_aios_key: str | None = Header(default=None),
+) -> dict:
+    """
+    Record LLM usage from any Expansao AI project.
+
+    Usage (e.g. in Climate or GRC Flow):
+        import httpx
+        httpx.post(
+            "https://aios.expansao-ai.com.br/track",
+            headers={"X-AIOS-Key": "<TRACK_API_KEY>"},
+            json={
+                "project": "climate",
+                "agent_name": "weather_analyzer",
+                "model": "claude-sonnet-4-6",
+                "input_tokens": response.usage.input_tokens,
+                "output_tokens": response.usage.output_tokens,
+                "duration_ms": 1500,
+            },
+        )
+    """
+    from orchestrator.settings import settings  # noqa: PLC0415
+    from tools.usage_tracker import estimate_cost, log_run  # noqa: PLC0415
+
+    if settings.track_api_key and x_aios_key != settings.track_api_key:
+        raise HTTPException(status_code=403, detail="Invalid or missing X-AIOS-Key")
+
+    cost = estimate_cost(req.model, req.input_tokens, req.output_tokens)
+    log_run(
+        project=req.project,
+        pipeline=req.pipeline,
+        agent_name=req.agent_name,
+        model=req.model,
+        input_tokens=req.input_tokens,
+        output_tokens=req.output_tokens,
+        cost_usd=cost,
+        duration_ms=req.duration_ms,
+    )
+    return {"recorded": True, "cost_usd": round(cost, 6)}
+
+
+@app.get("/usage/summary")
+def usage_summary(days: int = 30) -> dict:
+    """Return cost and token usage aggregated by project and agent for the past N days."""
+    from tools.usage_tracker import query_summary  # noqa: PLC0415
+    return query_summary(days=days)
 
 
 # ── Status ────────────────────────────────────────────────────────────────────

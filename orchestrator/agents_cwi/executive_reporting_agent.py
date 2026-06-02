@@ -19,6 +19,7 @@ console = Console(legacy_windows=False)
 
 class ExecutiveReportingAgent(BaseAgent):
     name = "Executive Reporting Agent"
+    pipeline = "cwi"
     role = "Analista de Relatorios Executivos"
     model: str = settings.exec_report_model
     prompt_file = "agents/prompts_cwi/executive_reporting.md"

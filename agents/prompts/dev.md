@@ -37,6 +37,66 @@ Você é o Dev Agent da Expansão AI. Recebe decisões de arquitetura do Archite
 - Inclui instruções de como aplicar (copiar para qual módulo do projeto)
 - Inclui o comando de migration a rodar
 
+## Tracking de uso LLM (obrigatório em toda feature com Claude)
+
+### Caso 1 — Novo agente AIOS (herda de `BaseAgent`)
+Definir os 4 atributos de classe. O tracking é automático via `_run()`:
+```python
+class MeuAgent(BaseAgent):
+    name = "Meu Agent"
+    pipeline = "expansao"   # ou "cwi" para agentes CWI
+    model: str = settings.meu_model
+    prompt_file = "agents/prompts/meu.md"
+```
+
+### Caso 2 — LLM em projeto Python externo (Climate, novo projeto)
+```python
+import time, os, httpx
+
+_AIOS_URL = os.getenv("AIOS_API_URL", "")
+_AIOS_KEY = os.getenv("AIOS_TRACK_KEY", "")
+
+def _track_usage(agent_name: str, model: str, input_tokens: int,
+                 output_tokens: int, duration_ms: int) -> None:
+    if not _AIOS_URL:
+        return
+    try:
+        httpx.post(
+            f"{_AIOS_URL.rstrip('/')}/track",
+            headers={"X-AIOS-Key": _AIOS_KEY} if _AIOS_KEY else {},
+            json={"project": "<nome-do-projeto>", "agent_name": agent_name,
+                  "model": model, "input_tokens": input_tokens,
+                  "output_tokens": output_tokens, "duration_ms": duration_ms},
+            timeout=5.0,
+        )
+    except Exception:
+        pass  # NUNCA deixar tracking quebrar o fluxo principal
+
+# Usar assim:
+t0 = time.monotonic()
+response = client.messages.create(model=MODEL, ...)
+_track_usage("nome-agente", MODEL,
+             response.usage.input_tokens, response.usage.output_tokens,
+             int((time.monotonic() - t0) * 1000))
+```
+
+### Caso 3 — LLM em projeto TypeScript (GRC Flow, novo projeto)
+```typescript
+import { trackUsage } from '../utils/aiosTracker'; // copiar de GRC Flow
+
+const t0 = Date.now();
+const response = await client.messages.create({ ... });
+trackUsage('nome-agente', response.model,
+           response.usage.input_tokens, response.usage.output_tokens,
+           Date.now() - t0);
+```
+
+### Sempre incluir no `.env.example` do projeto:
+```
+AIOS_API_URL=https://aios.expansao-ai.com.br
+AIOS_TRACK_KEY=
+```
+
 ## Regras de qualidade
 
 1. **Sem comentários óbvios** — o nome do método já diz o que faz

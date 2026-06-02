@@ -7,6 +7,11 @@ class Settings(BaseSettings):
     # Anthropic
     anthropic_api_key: str
 
+    # Usage tracking (optional — falls back to outputs/agent_runs.jsonl if unset)
+    database_url: str = ""
+    # Secret for POST /track — external projects must send X-AIOS-Key header
+    track_api_key: str = ""
+
     # Notion
     notion_api_key: str
     notion_backlog_db_id: str
