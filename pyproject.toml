@@ -13,6 +13,7 @@ dependencies = [
     "rich>=13.7.1",
     "typer>=0.12.3",
     "pyyaml>=6.0.1",
+    "mcp>=1.9.0",
 ]
 
 [project.optional-dependencies]
@@ -21,6 +22,7 @@ dev = ["pytest>=8.2.0", "pytest-asyncio>=0.23.7", "ruff>=0.4.9", "mypy>=1.10.0"]
 
 [project.scripts]
 aios = "orchestrator.cli:app"
+aios-mcp = "orchestrator.mcp_server:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -71,7 +71,25 @@ class MeetingSecretaryAgent(BaseAgent):
             console.print("[yellow]Transcricao vazia — entrada ignorada.[/]")
             raise ValueError("Transcricao vazia")
 
-        # 2. Run Claude
+        # 2. Detect intent — route non-meeting inputs to the right agent
+        intent = self._classify_intent(transcript)
+        console.print(f"[dim]Intencao detectada: {intent}[/]")
+
+        if intent == "spec":
+            from orchestrator.agents.spec_agent import SpecAgent  # noqa: PLC0415
+            result = SpecAgent().run(input_text=transcript, pipeline="CWI", origem="Reunião")
+            return {"intent": "spec", "spec_notion_page": result.get("notion_page_id", ""), **result.get("spec", {})}
+
+        if intent == "diagram":
+            from orchestrator.agents.diagram_agent import DiagramAgent  # noqa: PLC0415
+            paths = DiagramAgent().run(input_text=transcript)
+            return {"intent": "diagram", "files": [str(p) for p in paths]}
+
+        if intent == "command":
+            console.print("[yellow]Comando generico recebido — nao processado pelo Secretary.[/]")
+            return {"intent": "command", "input": transcript[:200]}
+
+        # 3. Process as meeting transcript (default)
         user_message = f"""Processe a transcricao abaixo e gere o output estruturado conforme instrucoes.
 
 TRANSCRICAO:
@@ -81,26 +99,27 @@ Retorne apenas o JSON, sem texto adicional."""
 
         response_text = self._run(user_message, max_tokens=8192)
 
-        # 3. Parse output
+        # 4. Parse output
         output = self._parse_json_output(response_text)
+        output["intent"] = "meeting"
 
-        # 4. Save locally
+        # 5. Save locally
         today = date.today().strftime("%Y_%m_%d")
         self._save_output(output, f"cwi/meeting_{today}.json")
 
-        # 5. Save to Notion CWI Meetings
+        # 6. Save to Notion CWI Meetings
         if settings.cwi_meetings_db_id:
             self.notion.create_meeting_page(output)
 
-        # 6. Mark control entry as Gerado
+        # 7. Mark control entry as Gerado
         if entry_page_id:
             self._mark_entry_gerado(entry_page_id, output)
 
-        # 7. Notify Slack
+        # 8. Notify Slack
         if settings.slack_webhook_url_cwi and output.get("slack_summary"):
             post_slack_message(f"[REUNIAO] *{output.get('titulo', 'Reuniao')}*\n{output['slack_summary']}", channel="cwi")
 
-        # 8. Trigger task digest so pending tasks are always up to date
+        # 9. Trigger task digest so pending tasks are always up to date
         try:
             from orchestrator.agents_cwi.task_digest_agent import TaskDigestAgent  # noqa: PLC0415
             TaskDigestAgent().run(triggered_by="meeting")
@@ -109,6 +128,28 @@ Retorne apenas o JSON, sem texto adicional."""
 
         console.print("[green]Meeting Secretary concluido.[/]")
         return output
+
+    def _classify_intent(self, text: str) -> str:
+        """Classify input as 'meeting', 'spec', 'diagram', or 'command' using Claude Haiku."""
+        prompt = """Classifique o texto abaixo em uma das categorias:
+- "meeting": transcricao de reuniao (pessoas falando, discussoes, decisoes)
+- "spec": pedido para gerar especificacao funcional de um sistema ou feature
+- "diagram": pedido para gerar diagrama de fluxo ou mapa de processo
+- "command": outro comando ou pergunta
+
+Responda APENAS com uma palavra: meeting, spec, diagram ou command."""
+
+        try:
+            resp = self.client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=10,
+                system=prompt,
+                messages=[{"role": "user", "content": text[:2000]}],
+            )
+            intent = resp.content[0].text.strip().lower()  # type: ignore[union-attr]
+            return intent if intent in ("meeting", "spec", "diagram", "command") else "meeting"
+        except Exception:
+            return "meeting"  # fail-safe: treat as meeting
 
     def _read_notion_page(self, page_id: str) -> str:
         """Fetch all text blocks from a Notion page and return as plain text."""
