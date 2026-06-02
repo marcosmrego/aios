@@ -25,15 +25,39 @@ class PMAgent(BaseAgent):
         super().__init__()
         self.notion = NotionClient()
 
-    def run(self, ceo_output: dict[str, Any]) -> dict[str, Any]:
-        """Generate PRDs from CEO plan -> persist to Notion -> human gate."""
+    def run(
+        self,
+        ceo_output: dict[str, Any] | None = None,
+        spec_data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Generate PRDs from CEO plan or approved Spec. Persists to Notion + human gate."""
         console.rule("[bold]PM Agent")
 
-        sprint = ceo_output.get("week", "?")
-        priorities_json = json.dumps(ceo_output.get("priorities", []), ensure_ascii=False, indent=2)
-        pm_instructions = ceo_output.get("pm_instructions", "")
+        if spec_data:
+            # Input from approved Spec (Watcher flow)
+            from datetime import date  # noqa: PLC0415
+            sprint = date.today().strftime("%Y-W%W")
+            spec_json = json.dumps(spec_data, ensure_ascii=False, indent=2)
+            user_message = f"""
+## Especificacao Funcional Aprovada
+**Sprint**: {sprint}
 
-        user_message = f"""
+A especificacao abaixo foi revisada e aprovada. Gere os PRDs e User Stories correspondentes.
+
+```json
+{spec_json}
+```
+
+Por favor, escreva os PRDs e User Stories para cada caso de uso e epico da spec.
+Inclua o JSON de output ao final da sua resposta.
+"""
+        else:
+            # Input from CEO Agent (standard flow)
+            ceo_output = ceo_output or {}
+            sprint = ceo_output.get("week", "?")
+            priorities_json = json.dumps(ceo_output.get("priorities", []), ensure_ascii=False, indent=2)
+            pm_instructions = ceo_output.get("pm_instructions", "")
+            user_message = f"""
 ## Output do CEO Agent
 **Sprint**: {sprint}
 

@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     slack_webhook_url_cwi: str = ""
     slack_webhook_url_expansao: str = ""
 
+    # Specs DB
+    notion_specs_db_id: str = ""
+
     # N8N
     n8n_base_url: str = ""
     n8n_api_key: str = ""

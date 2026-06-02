@@ -6,8 +6,8 @@ from rich.console import Console
 app = typer.Typer(name="aios", help="Expansao AI OS -- Multi-agent orchestrator")
 console = Console(legacy_windows=False)
 
-_AGENTS_EXPANSAO = ["ceo", "pm", "architect", "dev", "qa", "devops", "marketing", "spec", "all"]
-_AGENTS_CWI = ["meeting-secretary", "pmo", "agile-coach", "product", "executive-reporting", "presentation", "spec", "all"]
+_AGENTS_EXPANSAO = ["ceo", "pm", "architect", "dev", "qa", "devops", "marketing", "spec", "diagram", "all"]
+_AGENTS_CWI = ["meeting-secretary", "pmo", "agile-coach", "product", "executive-reporting", "presentation", "spec", "diagram", "all"]
 _PIPELINES = ["expansao", "cwi"]
 
 
@@ -17,7 +17,8 @@ def run(
     agent: str = typer.Option("all", "--agent", "-a", help="Agente especifico a executar"),
     pipeline: str = typer.Option("expansao", "--pipeline", "-p", help="Pipeline: expansao | cwi"),
     start_from: str = typer.Option("", "--start-from", "-s", help="Retomar pipeline a partir de um agente"),
-    input_file: str = typer.Option("", "--input", "-i", help="(CWI) Arquivo de input para o agente"),
+    input_file: str = typer.Option("", "--input", "-i", help="Arquivo de input para o agente"),
+    input_text: str = typer.Option("", "--input-text", "-t", help="Texto livre como input (spec/diagram)"),
 ) -> None:
     """Run a pipeline or a specific agent. Use --pipeline to select: expansao (default) or cwi."""
     if pipeline not in _PIPELINES:
@@ -25,7 +26,7 @@ def run(
         raise typer.Exit(1)
 
     if pipeline == "cwi":
-        _run_cwi_command(agent, context, start_from or "meeting_secretary", input_file)
+        _run_cwi_command(agent, context, start_from or "meeting_secretary", input_file, input_text)
         return
 
     # ── Expansao AI pipeline ──────────────────────────────────────────────────
@@ -46,12 +47,13 @@ def run(
         "qa": _run_qa,
         "devops": _run_devops,
         "marketing": _run_marketing,
-        "spec": lambda _: _run_spec(input_file),
+        "spec": lambda _: _run_spec(input_file, input_text),
+        "diagram": lambda _: _run_diagram(input_file, input_text),
     }
     agent_map[agent](context)
 
 
-def _run_cwi_command(agent: str, context: str, start_from: str, input_file: str) -> None:
+def _run_cwi_command(agent: str, context: str, start_from: str, input_file: str, input_text: str = "") -> None:
     """Dispatch CWI agent or full CWI pipeline."""
     if agent == "all":
         from orchestrator.pipeline_cwi import run_pipeline_cwi  # noqa: PLC0415
@@ -65,7 +67,8 @@ def _run_cwi_command(agent: str, context: str, start_from: str, input_file: str)
         "product": lambda: _run_product(input_file),
         "executive-reporting": lambda: _run_executive_reporting(context),
         "presentation": lambda: _run_presentation(input_file),
-        "spec": lambda: _run_spec(input_file),
+        "spec": lambda: _run_spec(input_file, input_text),
+        "diagram": lambda: _run_diagram(input_file, input_text),
     }
 
     if agent not in agent_map_cwi:
@@ -124,6 +127,7 @@ def _status_cwi() -> None:
         "Executive Report":  "executive_report_",
         "Task Digest":       "digest_",
         "Presentation":      "presentation_",
+        "Spec":              "specs/spec_",
     }
 
     for label, prefix in stages.items():
@@ -283,9 +287,14 @@ def _run_presentation(input_file: str) -> None:
     PresentationAgent().run(input_file=input_file)
 
 
-def _run_spec(input_file: str) -> None:
+def _run_spec(input_file: str, input_text: str = "") -> None:
     from orchestrator.agents.spec_agent import SpecAgent  # noqa: PLC0415
-    SpecAgent().run(input_file=input_file)
+    SpecAgent().run(input_file=input_file, input_text=input_text)
+
+
+def _run_diagram(input_file: str, input_text: str = "") -> None:
+    from orchestrator.agents.diagram_agent import DiagramAgent  # noqa: PLC0415
+    DiagramAgent().run(input_file=input_file or None, input_text=input_text)
 
 
 @app.command()
@@ -311,8 +320,8 @@ def watch(
     interval: int = typer.Option(0, "--interval", "-i", help="Intervalo em segundos entre verificacoes (default: 120)"),
 ) -> None:
     """Watch Notion for new meeting transcriptions and process them automatically."""
-    from orchestrator.watcher import watch_cwi_meetings  # noqa: PLC0415
-    watch_cwi_meetings(interval_seconds=interval)
+    from orchestrator.watcher import watch_all  # noqa: PLC0415
+    watch_all(interval_seconds=interval)
 
 
 if __name__ == "__main__":

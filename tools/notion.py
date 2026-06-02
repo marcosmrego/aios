@@ -249,6 +249,120 @@ class NotionClient:
         self._patch(f"/pages/{page_id}", {"properties": {"Status": {"select": {"name": status}}}})
 
     # ------------------------------------------------------------------
+    # Specs DB
+    # ------------------------------------------------------------------
+
+    def create_spec_page(
+        self,
+        spec: dict[str, Any],
+        input_text: str,
+        pipeline: str,
+        origem: str,
+    ) -> str:
+        """Create a spec page in the Specs DB. Returns page ID."""
+        if not settings.notion_specs_db_id:
+            return ""
+
+        titulo = spec.get("titulo", "Spec sem título")
+
+        # Build content blocks from spec structure
+        children: list[dict[str, Any]] = [
+            self._heading("Objetivo", level=2),
+            self._paragraph(spec.get("objetivo", "")),
+        ]
+
+        escopo = spec.get("escopo", {})
+        if escopo.get("inclui") or escopo.get("exclui"):
+            children.append(self._heading("Escopo", level=2))
+            inclui = "\n".join(f"✓ {i}" for i in escopo.get("inclui", []))
+            exclui = "\n".join(f"✗ {i}" for i in escopo.get("exclui", []))
+            children.append(self._paragraph((inclui + "\n" + exclui).strip()))
+
+        ucs = spec.get("casos_de_uso", [])
+        if ucs:
+            children.append(self._heading("Casos de Uso", level=2))
+            for uc in ucs:
+                fluxo = "\n".join(uc.get("fluxo_principal", []))
+                children.append(self._paragraph(
+                    f"{uc['id']} — {uc['nome']}\nAtor: {uc.get('ator_principal', '-')}\n{fluxo}"
+                ))
+
+        rns = spec.get("regras_de_negocio", [])
+        if rns:
+            children.append(self._heading("Regras de Negócio", level=2))
+            children.append(self._paragraph(
+                "\n".join(f"{r['id']}: {r['regra']}" for r in rns)
+            ))
+
+        perguntas = spec.get("perguntas_em_aberto", [])
+        if perguntas:
+            children.append(self._heading("Perguntas em Aberto", level=2))
+            children.append(self._paragraph("\n".join(f"• {p}" for p in perguntas)))
+
+        if input_text:
+            children.append(self._heading("Input Original", level=2))
+            children.append(self._paragraph(input_text[:2000]))
+
+        page = self._post("/pages", {
+            "parent": {"database_id": settings.notion_specs_db_id},
+            "properties": {
+                "Name": {"title": [{"text": {"content": titulo}}]},
+                "Status": {"select": {"name": "Rascunho"}},
+                "Pipeline": {"select": {"name": pipeline}},
+                "Origem": {"select": {"name": origem}},
+                "Aprovado": {"checkbox": False},
+                "Execução": {"select": {"name": "Primeiro Agente"}},
+                "Data": {"date": {"start": date.today().isoformat()}},
+            },
+            "children": children,
+        })
+        return page["id"]
+
+    def get_approved_specs(self, pipeline: str | None = None) -> list[dict[str, Any]]:
+        """Query Specs DB for approved specs not yet in development."""
+        if not settings.notion_specs_db_id:
+            return []
+
+        conditions: list[dict[str, Any]] = [
+            {"property": "Aprovado", "checkbox": {"equals": True}},
+            {"property": "Status", "select": {"equals": "Aprovado"}},
+        ]
+        if pipeline:
+            conditions.append({"property": "Pipeline", "select": {"equals": pipeline}})
+
+        results = self._post(
+            f"/databases/{settings.notion_specs_db_id}/query",
+            {"filter": {"and": conditions}},
+        ).get("results", [])
+
+        specs = []
+        for page in results:
+            props = page.get("properties", {})
+            specs.append({
+                "page_id": page["id"],
+                "titulo": self._text(props.get("Name")),
+                "pipeline": self._select(props.get("Pipeline")),
+                "execucao": self._select(props.get("Execução")),
+                "content": self._extract_page_text(page["id"]),
+            })
+        return specs
+
+    def _extract_page_text(self, page_id: str) -> str:
+        """Extract plain text from a page's blocks."""
+        try:
+            blocks = self._get(f"/blocks/{page_id}/children").get("results", [])
+            lines = []
+            for b in blocks[:50]:
+                btype = b.get("type", "")
+                rich = b.get(btype, {}).get("rich_text", [])
+                text = "".join(t.get("plain_text", "") for t in rich)
+                if text:
+                    lines.append(text)
+            return "\n".join(lines)
+        except Exception:
+            return ""
+
+    # ------------------------------------------------------------------
     # Helpers for property parsing
     # ------------------------------------------------------------------
 

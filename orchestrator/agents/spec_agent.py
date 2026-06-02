@@ -1,4 +1,4 @@
-"""Spec Agent — generates functional specification (.md + .docx) from PM or Product Agent output."""
+"""Spec Agent — generates functional specification (.md + .docx) from any input."""
 
 from __future__ import annotations
 
@@ -14,10 +14,18 @@ from rich.console import Console
 
 from orchestrator.base_agent import BaseAgent
 from orchestrator.settings import settings
+from tools.notion import NotionClient
 
 console = Console(legacy_windows=False)
 
 DOCS_DIR = Path("documents/specs")
+
+_ORIGEM_MAP = {
+    "text": "Texto Livre",
+    "file": "Documento",
+    "data": "Documento",
+    "auto": "Documento",
+}
 
 
 class SpecAgent(BaseAgent):
@@ -29,40 +37,72 @@ class SpecAgent(BaseAgent):
     def __init__(self) -> None:
         self.model = settings.architect_model
         super().__init__()
+        self.notion = NotionClient()
 
-    def run(self, input_file: str = "", input_data: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Generate functional spec (.md + .docx) from PM or Product Agent JSON output."""
+    def run(
+        self,
+        input_file: str = "",
+        input_data: dict[str, Any] | None = None,
+        input_text: str = "",
+        pipeline: str = "",
+        origem: str = "",
+    ) -> dict[str, Any]:
+        """Generate functional spec (.md + .docx) from any input source.
+
+        Priority: input_text > input_data > input_file > auto-detect latest output.
+        """
         console.rule("[bold]Spec Agent")
 
         # 1. Load input
-        if input_data:
+        raw_input = ""
+        if input_text:
+            data = {"titulo": input_text[:80], "_raw_text": input_text}
+            label = input_text[:40].replace(" ", "_").lower()
+            raw_input = input_text
+            _origem = origem or "Texto Livre"
+        elif input_data:
             data = input_data
             label = data.get("titulo", data.get("sprint", "spec")).replace(" ", "_").lower()
+            _origem = origem or "Documento"
         elif input_file:
-            data = json.loads(Path(input_file).read_text(encoding="utf-8"))
+            content = Path(input_file).read_text(encoding="utf-8")
+            try:
+                data = json.loads(content)
+            except json.JSONDecodeError:
+                data = {"titulo": Path(input_file).stem, "_raw_text": content}
+                raw_input = content
             label = Path(input_file).stem
+            _origem = origem or "Documento"
         else:
             raw, label = self._load_latest_output()
             data = json.loads(raw)
+            _origem = origem or "Documento"
 
-        # 2. Detect pipeline and extract items to process
-        items = self._extract_items(data)
-        pipeline = "cwi" if "epicos" in data or "origem" in data else "expansao"
+        # 2. Detect pipeline
+        if not pipeline:
+            pipeline = "CWI" if ("epicos" in data or "origem" in data) else "Expansão AI"
+
+        # 3. Extract items or use raw text directly
+        raw_text = data.get("_raw_text", "")
+        if raw_text:
+            items = [{"titulo": data.get("titulo", "Spec"), "_raw_text": raw_text}]
+        else:
+            items = self._extract_items(data)
+
         doc_title = data.get("titulo", data.get("origem", label))
-
         console.print(f"[dim]Pipeline: {pipeline} | Itens: {len(items)}[/]")
 
-        # 3. Generate spec per item (avoids token limit on large inputs)
+        # 4. Generate spec per item
         all_specs: list[dict[str, Any]] = []
         for i, item in enumerate(items, 1):
             console.print(f"[dim]Gerando spec {i}/{len(items)}: {item.get('titulo', item.get('id', '?'))}[/]")
             spec = self._spec_for_item(item, pipeline, doc_title)
             all_specs.append(spec)
 
-        # 4. Merge all specs into one document
+        # 5. Merge
         merged = self._merge_specs(all_specs, doc_title, pipeline)
 
-        # 5. Save files
+        # 6. Save files
         today = date.today().strftime("%Y_%m_%d")
         slug = label[:40].replace("/", "_")
         base_name = f"spec_{slug}_{today}"
@@ -72,7 +112,36 @@ class SpecAgent(BaseAgent):
 
         console.print(f"[green]Markdown:[/] {md_path}")
         console.print(f"[green]Word:[/]     {docx_path}")
-        return {"md": md_path, "docx": docx_path, "spec": merged}
+
+        # 7. Persist to Notion Specs DB
+        notion_page_id = ""
+        if settings.notion_specs_db_id:
+            try:
+                notion_page_id = self.notion.create_spec_page(
+                    spec=merged,
+                    input_text=raw_input or json.dumps(data, ensure_ascii=False)[:1000],
+                    pipeline=pipeline,
+                    origem=_origem,
+                )
+                console.print(f"[green]Notion:[/]   {notion_page_id}")
+            except Exception as e:
+                console.print(f"[yellow]Notion falhou (nao critico): {e}[/]")
+
+        # 8. Generate diagrams automatically
+        try:
+            from orchestrator.agents.diagram_agent import DiagramAgent  # noqa: PLC0415
+            diagram_paths = DiagramAgent().run(spec=merged, label=slug)
+        except Exception as e:
+            console.print(f"[yellow]DiagramAgent falhou (nao critico): {e}[/]")
+            diagram_paths = []
+
+        return {
+            "md": md_path,
+            "docx": docx_path,
+            "spec": merged,
+            "notion_page_id": notion_page_id,
+            "diagrams": diagram_paths,
+        }
 
     # ── Item extraction ───────────────────────────────────────────────────────
 
