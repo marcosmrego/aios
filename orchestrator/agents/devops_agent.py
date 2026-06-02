@@ -102,9 +102,10 @@ Inclua o JSON de output ao final da sua resposta.
         success_count = sum(1 for d in output.get("deploys", []) if d.get("status") == "success")
         total = len(output.get("deploys", []))
         status_icon = "[DEPLOY]" if success_count == total else "[WARN]"
-        if settings.slack_webhook_url and output.get("slack_summary"):
+        if settings.slack_webhook_url_expansao and output.get("slack_summary"):
             post_slack_message(
-                f"{status_icon} *Deploy — {sprint}* ({success_count}/{total} ok)\n{output['slack_summary']}"
+                f"{status_icon} *Deploy — {sprint}* ({success_count}/{total} ok)\n{output['slack_summary']}",
+                channel="expansao",
             )
 
         all_success = all(d.get("status") in ("success", "planned") for d in output.get("deploys", []))

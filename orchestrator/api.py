@@ -167,11 +167,12 @@ async def deploy_callback(req: DeployCallbackRequest) -> dict:
             pass
 
     icon = "[OK]" if req.status == "success" else "[FAIL]"
-    if settings.slack_webhook_url:
+    if settings.slack_webhook_url_expansao:
         post_slack_message(
             f"{icon} *Deploy {req.service}* ({req.environment})\n"
             f"Status: {req.status}\n"
-            f"URL: {req.url or 'N/A'}"
+            f"URL: {req.url or 'N/A'}",
+            channel="expansao",
         )
 
     return {"received": True, "service": req.service, "status": req.status}
@@ -260,5 +261,5 @@ def _do_deploy_aios() -> None:
     summary = "\n".join(results)
     log.info(f"AIOS deploy triggered:\n{summary}")
 
-    if settings.slack_webhook_url:
-        post_slack_message(f"[DEVOPS] *Deploy AIOS disparado*\n{summary}")
+    if settings.slack_webhook_url_expansao:
+        post_slack_message(f"[DEVOPS] *Deploy AIOS disparado*\n{summary}", channel="expansao")

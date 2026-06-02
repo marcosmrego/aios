@@ -63,8 +63,8 @@ Inclua o JSON de output ao final da sua resposta.
             self.notion.create_prd_page(sprint, prd)
 
         # Notify Slack
-        if settings.slack_webhook_url and output.get("slack_summary"):
-            post_slack_message(f"📝 *PRDs criados — {sprint}*\n{output['slack_summary']}")
+        if settings.slack_webhook_url_expansao and output.get("slack_summary"):
+            post_slack_message(f"📝 *PRDs criados — {sprint}*\n{output['slack_summary']}", channel="expansao")
 
         # Human gate: PM output -> Architect
         prd_titles = ", ".join(p.get("title", "?") for p in output.get("prds", []))

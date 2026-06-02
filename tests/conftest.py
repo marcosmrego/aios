@@ -122,7 +122,8 @@ def mock_settings(monkeypatch: pytest.MonkeyPatch) -> None:
         "NOTION_BACKLOG_DB_ID": "backlog-db-id",
         "NOTION_PROJECTS_DB_ID": "projects-db-id",
         "NOTION_SPRINTS_DB_ID": "sprints-db-id",
-        "SLACK_WEBHOOK_URL": "",
+        "SLACK_WEBHOOK_URL_CWI": "",
+        "SLACK_WEBHOOK_URL_EXPANSAO": "",
         "HUMAN_IN_THE_LOOP": "false",
     }
     for key, value in env_vars.items():

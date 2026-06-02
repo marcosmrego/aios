@@ -73,8 +73,8 @@ Retorne apenas o JSON, sem texto adicional."""
                 self.notion.create_backlog_epic(epic)
 
         # 7. Notify Slack
-        if settings.slack_webhook_url and output.get("slack_summary"):
-            post_slack_message(f"[PRODUTO] *Backlog atualizado*\n{output['slack_summary']}")
+        if settings.slack_webhook_url_cwi and output.get("slack_summary"):
+            post_slack_message(f"[PRODUTO] *Backlog atualizado*\n{output['slack_summary']}", channel="cwi")
 
         console.print("[green]Product Agent concluido.[/]")
         return output

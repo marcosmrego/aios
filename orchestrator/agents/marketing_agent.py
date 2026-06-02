@@ -76,9 +76,10 @@ Inclua o JSON de output ao final da sua resposta.
         for piece in output.get("content_pieces", []):
             self.notion.create_content_page(sprint, piece)
 
-        if settings.slack_webhook_url and output.get("slack_summary"):
+        if settings.slack_webhook_url_expansao and output.get("slack_summary"):
             post_slack_message(
-                f"📣 *Conteúdo criado para revisão — {sprint}*\n{output['slack_summary']}"
+                f"📣 *Conteúdo criado para revisão — {sprint}*\n{output['slack_summary']}",
+                channel="expansao",
             )
 
         # Human gate: Content -> Publish

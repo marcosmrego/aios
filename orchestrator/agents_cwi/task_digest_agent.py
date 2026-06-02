@@ -71,7 +71,7 @@ class TaskDigestAgent:
         console.print(f"[green]Digest salvo no Notion[/]")
 
         # 5. Notify Slack (if configured)
-        if settings.slack_webhook_url:
+        if settings.slack_webhook_url_cwi:
             self._notify_slack(output, alta)
 
         return output
@@ -215,4 +215,4 @@ class TaskDigestAgent:
                 lines.append(f"  - [{a['id']}] {a['descricao'][:60]} — {a['responsavel']}")
             if len(alta) > 5:
                 lines.append(f"  ... +{len(alta) - 5} mais")
-        post_slack_message("\n".join(lines), channel="cwi-aios")
+        post_slack_message("\n".join(lines), channel="cwi")

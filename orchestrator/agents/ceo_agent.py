@@ -68,9 +68,10 @@ no formato especificado no system prompt. Inclua o JSON de output ao final da su
         self.notion.create_sprint_page(week, output)
 
         # 7. Notify Slack
-        if settings.slack_webhook_url and output.get("slack_summary"):
+        if settings.slack_webhook_url_expansao and output.get("slack_summary"):
             post_slack_message(
-                f"[CEO] *Plano Semanal CEO — {week}*\n{output['slack_summary']}"
+                f"[CEO] *Plano Semanal CEO — {week}*\n{output['slack_summary']}",
+                channel="expansao",
             )
 
         # 8. Human-in-the-loop gate CEO -> PM

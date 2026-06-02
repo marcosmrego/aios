@@ -6,13 +6,23 @@ import httpx
 
 from orchestrator.settings import settings
 
+_CHANNEL_WEBHOOKS = {
+    "cwi": lambda: settings.slack_webhook_url_cwi,
+    "expansao": lambda: settings.slack_webhook_url_expansao,
+}
 
-def post_slack_message(text: str) -> bool:
-    """Post a message to the configured Slack webhook. Returns True on success."""
-    if not settings.slack_webhook_url:
+
+def post_slack_message(text: str, channel: str = "expansao") -> bool:
+    """Post a message to a Slack channel webhook. Returns True on success.
+
+    channel: "cwi" → #cwi-aios, "expansao" → #expansao-aios (default)
+    """
+    getter = _CHANNEL_WEBHOOKS.get(channel, lambda: settings.slack_webhook_url_expansao)
+    url = getter()
+    if not url:
         return False
     try:
-        resp = httpx.post(settings.slack_webhook_url, json={"text": text}, timeout=10)
+        resp = httpx.post(url, json={"text": text}, timeout=10)
         return resp.status_code == 200
     except httpx.HTTPError:
         return False

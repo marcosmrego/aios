@@ -7,7 +7,7 @@ app = typer.Typer(name="aios", help="Expansao AI OS -- Multi-agent orchestrator"
 console = Console(legacy_windows=False)
 
 _AGENTS_EXPANSAO = ["ceo", "pm", "architect", "dev", "qa", "devops", "marketing", "all"]
-_AGENTS_CWI = ["meeting-secretary", "pmo", "agile-coach", "product", "executive-reporting", "all"]
+_AGENTS_CWI = ["meeting-secretary", "pmo", "agile-coach", "product", "executive-reporting", "presentation", "all"]
 _PIPELINES = ["expansao", "cwi"]
 
 
@@ -63,6 +63,7 @@ def _run_cwi_command(agent: str, context: str, start_from: str, input_file: str)
         "agile-coach": lambda: _run_agile_coach(input_file, context),
         "product": lambda: _run_product(input_file),
         "executive-reporting": lambda: _run_executive_reporting(context),
+        "presentation": lambda: _run_presentation(input_file),
     }
 
     if agent not in agent_map_cwi:
@@ -120,6 +121,7 @@ def _status_cwi() -> None:
         "Product":           "product_",
         "Executive Report":  "executive_report_",
         "Task Digest":       "digest_",
+        "Presentation":      "presentation_",
     }
 
     for label, prefix in stages.items():
@@ -272,6 +274,11 @@ def _run_product(input_file: str) -> None:
 def _run_executive_reporting(context: str) -> None:
     from orchestrator.agents_cwi.executive_reporting_agent import ExecutiveReportingAgent  # noqa: PLC0415
     ExecutiveReportingAgent().run(extra_context=context)
+
+
+def _run_presentation(input_file: str) -> None:
+    from orchestrator.agents_cwi.presentation_agent import PresentationAgent  # noqa: PLC0415
+    PresentationAgent().run(input_file=input_file)
 
 
 @app.command()

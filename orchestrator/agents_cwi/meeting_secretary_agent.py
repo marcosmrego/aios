@@ -97,8 +97,8 @@ Retorne apenas o JSON, sem texto adicional."""
             self._mark_entry_gerado(entry_page_id, output)
 
         # 7. Notify Slack
-        if settings.slack_webhook_url and output.get("slack_summary"):
-            post_slack_message(f"[REUNIAO] *{output.get('titulo', 'Reuniao')}*\n{output['slack_summary']}")
+        if settings.slack_webhook_url_cwi and output.get("slack_summary"):
+            post_slack_message(f"[REUNIAO] *{output.get('titulo', 'Reuniao')}*\n{output['slack_summary']}", channel="cwi")
 
         # 8. Trigger task digest so pending tasks are always up to date
         try:

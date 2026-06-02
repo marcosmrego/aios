@@ -57,8 +57,8 @@ no formato especificado. Inclua o JSON de output ao final da sua resposta.
         for arch in output.get("architectures", []):
             self.notion.create_architecture_page(sprint, arch)
 
-        if settings.slack_webhook_url and output.get("slack_summary"):
-            post_slack_message(f"🏗️ *Arquitetura definida — {sprint}*\n{output['slack_summary']}")
+        if settings.slack_webhook_url_expansao and output.get("slack_summary"):
+            post_slack_message(f"🏗️ *Arquitetura definida — {sprint}*\n{output['slack_summary']}", channel="expansao")
 
         console.print("[green]Arquitetura documentada. Acionando Dev Agent...[/]")
         return output

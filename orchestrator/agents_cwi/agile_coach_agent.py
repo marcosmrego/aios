@@ -67,8 +67,8 @@ Retorne apenas o JSON, sem texto adicional."""
             self.notion.create_report_page("Agile Coach Report", output)
 
         # 6. Notify Slack
-        if settings.slack_webhook_url and output.get("slack_summary"):
-            post_slack_message(f"[AGILE] *Health Score: {output.get('health_score', '?')}/10*\n{output['slack_summary']}")
+        if settings.slack_webhook_url_cwi and output.get("slack_summary"):
+            post_slack_message(f"[AGILE] *Health Score: {output.get('health_score', '?')}/10*\n{output['slack_summary']}", channel="cwi")
 
         console.print("[green]Agile Coach Agent concluido.[/]")
         return output

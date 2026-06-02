@@ -87,9 +87,10 @@ Inclua o JSON de output ao final da sua resposta.
 
         # Slack notification
         status_icon = "[OK]" if approved else "[FAIL]"
-        if settings.slack_webhook_url and output.get("slack_summary"):
+        if settings.slack_webhook_url_expansao and output.get("slack_summary"):
             post_slack_message(
-                f"{status_icon} *QA Report — {sprint}*\n{output['slack_summary']}"
+                f"{status_icon} *QA Report — {sprint}*\n{output['slack_summary']}",
+                channel="expansao",
             )
 
         # Human-in-the-loop gate QA -> Deploy

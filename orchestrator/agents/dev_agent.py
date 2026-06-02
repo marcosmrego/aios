@@ -79,8 +79,8 @@ Inclua o JSON de output ao final da sua resposta.
             if prd.get("notion_id"):
                 self.notion.update_page_status(prd["notion_id"], "In Review")
 
-        if settings.slack_webhook_url and output.get("slack_summary"):
-            post_slack_message(f"💻 *Código implementado — {sprint}*\n{output['slack_summary']}")
+        if settings.slack_webhook_url_expansao and output.get("slack_summary"):
+            post_slack_message(f"💻 *Código implementado — {sprint}*\n{output['slack_summary']}", channel="expansao")
 
         console.print("[green]Implementação concluída. Acionando QA Agent...[/]")
         return output

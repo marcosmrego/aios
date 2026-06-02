@@ -14,7 +14,8 @@ class Settings(BaseSettings):
     notion_sprints_db_id: str
 
     # Slack
-    slack_webhook_url: str = ""
+    slack_webhook_url_cwi: str = ""
+    slack_webhook_url_expansao: str = ""
 
     # N8N
     n8n_base_url: str = ""
