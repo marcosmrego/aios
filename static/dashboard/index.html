@@ -41,10 +41,15 @@
 </section>
 
 <!-- Anthropic credits -->
-<section class="credits-section">
+<section>
+  <div class="section-header">
+    <h2>⚡ Saldo Anthropic</h2>
+    <button class="btn-ghost" onclick="toggleTopupForm()">+ Registrar recarga</button>
+  </div>
+
+  <!-- Summary card -->
   <div class="credits-card" id="credits-card">
     <div class="credits-left">
-      <div class="credits-title">⚡ Saldo Anthropic</div>
       <div class="credits-values">
         <span class="credits-remaining" id="credits-remaining">—</span>
         <span class="credits-sub" id="credits-sub">estimado restante</span>
@@ -52,16 +57,36 @@
       <div class="credits-bar-wrap">
         <div class="credits-bar" id="credits-bar" style="width:0%"></div>
       </div>
-      <div class="credits-detail" id="credits-detail">Configure ANTHROPIC_CREDIT_BALANCE no .env</div>
+      <div class="credits-detail" id="credits-detail">Registre uma recarga para ativar o monitoramento</div>
     </div>
-    <div class="credits-right">
-      <div class="credits-update">
-        <input type="number" id="credits-input" placeholder="Novo saldo USD" step="0.01" min="0">
-        <button onclick="updateCredits()">Atualizar</button>
+    <div class="credits-stats" id="credits-stats"></div>
+  </div>
+
+  <!-- Add topup form (hidden by default) -->
+  <div class="topup-form hidden" id="topup-form">
+    <h4>Nova recarga</h4>
+    <div class="topup-fields">
+      <div>
+        <label>Data da recarga</label>
+        <input type="date" id="topup-date">
       </div>
-      <div class="credits-note">Informe após cada recarga</div>
+      <div>
+        <label>Valor (USD)</label>
+        <input type="number" id="topup-amount" placeholder="Ex: 50.00" step="0.01" min="0.01">
+      </div>
+      <div style="flex:2">
+        <label>Observação (opcional)</label>
+        <input type="text" id="topup-notes" placeholder="Ex: Recarga mensal">
+      </div>
+    </div>
+    <div class="topup-actions">
+      <button class="btn-save" onclick="saveTopup()">Salvar recarga</button>
+      <button class="btn-ghost" onclick="toggleTopupForm()">Cancelar</button>
     </div>
   </div>
+
+  <!-- Topup history -->
+  <div id="topup-history"></div>
 </section>
 
 <!-- Active runs -->

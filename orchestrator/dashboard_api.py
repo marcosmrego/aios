@@ -135,69 +135,38 @@ def get_costs(user: str = Depends(_auth)) -> dict:
 
 @router.get("/credits")
 def get_credits(user: str = Depends(_auth)) -> dict:
-    """Return Anthropic credit balance estimate based on known balance minus spend since top-up."""
-    from orchestrator.settings import settings  # noqa: PLC0415
-    from tools.run_tracker import _conn  # noqa: PLC0415
-    from datetime import date  # noqa: PLC0415
-
-    known_balance = settings.anthropic_credit_balance
-    updated_at = settings.anthropic_credit_updated_at or date.today().isoformat()
-
-    spent_since = 0.0
-    c = _conn()
-    if c:
-        try:
-            with c.cursor() as cur:
-                cur.execute(
-                    "SELECT COALESCE(SUM(cost_usd), 0) FROM pipeline_runs WHERE started_at >= %s",
-                    (updated_at,),
-                )
-                row = cur.fetchone()
-                spent_since = float(row[0]) if row else 0.0
-        except Exception:
-            pass
-        finally:
-            c.close()
-
-    estimated = max(0.0, known_balance - spent_since)
-    pct = (estimated / known_balance * 100) if known_balance > 0 else 0
-
-    return {
-        "known_balance": known_balance,
-        "updated_at": updated_at,
-        "spent_since_topup": round(spent_since, 4),
-        "estimated_remaining": round(estimated, 4),
-        "percent_remaining": round(pct, 1),
-        "source": "estimated" if known_balance > 0 else "not_configured",
-    }
+    from tools.run_tracker import get_credit_summary  # noqa: PLC0415
+    return _serialize(get_credit_summary())
 
 
-@router.post("/credits/update")
-def update_credits(balance: float, user: str = Depends(_auth)) -> dict:
-    """Update the known Anthropic balance (call after each top-up)."""
-    from datetime import date  # noqa: PLC0415
-    # Write to .env file
-    env_path = __import__("pathlib").Path(".env")
-    today = date.today().isoformat()
-    if env_path.exists():
-        lines = env_path.read_text(encoding="utf-8").splitlines()
-        new_lines = []
-        found_balance = found_date = False
-        for line in lines:
-            if line.startswith("ANTHROPIC_CREDIT_BALANCE="):
-                new_lines.append(f"ANTHROPIC_CREDIT_BALANCE={balance}")
-                found_balance = True
-            elif line.startswith("ANTHROPIC_CREDIT_UPDATED_AT="):
-                new_lines.append(f"ANTHROPIC_CREDIT_UPDATED_AT={today}")
-                found_date = True
-            else:
-                new_lines.append(line)
-        if not found_balance:
-            new_lines.append(f"ANTHROPIC_CREDIT_BALANCE={balance}")
-        if not found_date:
-            new_lines.append(f"ANTHROPIC_CREDIT_UPDATED_AT={today}")
-        env_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-    return {"ok": True, "balance": balance, "updated_at": today}
+@router.get("/credits/topups")
+def list_topups(user: str = Depends(_auth)) -> list[dict]:
+    from tools.run_tracker import get_topups  # noqa: PLC0415
+    return _serialize(get_topups())
+
+
+class TopupRequest(BaseModel):
+    amount_usd: float
+    topup_date: str   # YYYY-MM-DD
+    notes: str = ""
+
+
+@router.post("/credits/topups", status_code=201)
+def create_topup(req: TopupRequest, user: str = Depends(_auth)) -> dict:
+    from tools.run_tracker import add_topup  # noqa: PLC0415
+    if req.amount_usd <= 0:
+        raise HTTPException(status_code=400, detail="amount_usd deve ser positivo")
+    row = add_topup(req.amount_usd, req.topup_date, req.notes)
+    if not row:
+        raise HTTPException(status_code=500, detail="Erro ao salvar recarga")
+    return _serialize(row)
+
+
+@router.delete("/credits/topups/{topup_id}")
+def remove_topup(topup_id: int, user: str = Depends(_auth)) -> dict:
+    from tools.run_tracker import delete_topup  # noqa: PLC0415
+    delete_topup(topup_id)
+    return {"ok": True}
 
 
 # ── Gate intervention ─────────────────────────────────────────────────────────

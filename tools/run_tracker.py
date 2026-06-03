@@ -7,6 +7,16 @@ from datetime import datetime, timezone
 from typing import Any
 
 
+_CREATE_CREDITS_SQL = """
+CREATE TABLE IF NOT EXISTS credit_topups (
+    id          SERIAL PRIMARY KEY,
+    amount_usd  NUMERIC(10,4) NOT NULL,
+    topup_date  DATE NOT NULL,
+    notes       TEXT DEFAULT '',
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+"""
+
 _CREATE_SQL = """
 CREATE TABLE IF NOT EXISTS pipeline_runs (
     id            SERIAL PRIMARY KEY,
@@ -56,6 +66,7 @@ def _conn():
     c = psycopg2.connect(settings.database_url)
     with c.cursor() as cur:
         cur.execute(_CREATE_SQL)
+        cur.execute(_CREATE_CREDITS_SQL)
     c.commit()
     return c
 
@@ -259,6 +270,115 @@ def get_run_detail(run_id: str) -> dict | None:
         return run
     except Exception:
         return None
+    finally:
+        c.close()
+
+
+def add_topup(amount_usd: float, topup_date: str, notes: str = "") -> dict | None:
+    """Insert a credit top-up record. topup_date is ISO string YYYY-MM-DD."""
+    c = _conn()
+    if not c:
+        return None
+    try:
+        import psycopg2.extras  # noqa: PLC0415
+        with c.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "INSERT INTO credit_topups (amount_usd, topup_date, notes) VALUES (%s, %s, %s) RETURNING *",
+                (amount_usd, topup_date, notes),
+            )
+            row = dict(cur.fetchone())
+        c.commit()
+        return row
+    except Exception:
+        c.rollback()
+        return None
+    finally:
+        c.close()
+
+
+def delete_topup(topup_id: int) -> bool:
+    c = _conn()
+    if not c:
+        return False
+    try:
+        with c.cursor() as cur:
+            cur.execute("DELETE FROM credit_topups WHERE id = %s", (topup_id,))
+        c.commit()
+        return True
+    except Exception:
+        c.rollback()
+        return False
+    finally:
+        c.close()
+
+
+def get_topups() -> list[dict]:
+    c = _conn()
+    if not c:
+        return []
+    try:
+        import psycopg2.extras  # noqa: PLC0415
+        with c.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM credit_topups ORDER BY topup_date DESC, created_at DESC")
+            return [dict(r) for r in cur.fetchall()]
+    except Exception:
+        return []
+    finally:
+        c.close()
+
+
+def get_credit_summary() -> dict:
+    """Calculate estimated remaining balance from topup history vs pipeline spend."""
+    c = _conn()
+    if not c:
+        return {"configured": False}
+    try:
+        import psycopg2.extras  # noqa: PLC0415
+        with c.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Total topped up ever
+            cur.execute("SELECT COALESCE(SUM(amount_usd), 0) AS total, MIN(topup_date) AS first_date FROM credit_topups")
+            row = dict(cur.fetchone())
+            total_topup = float(row["total"])
+            first_date = row["first_date"]
+
+            if not first_date:
+                return {"configured": False}
+
+            # All topups list
+            cur.execute("SELECT * FROM credit_topups ORDER BY topup_date DESC")
+            topups = [dict(r) for r in cur.fetchall()]
+
+            # Total spent since the first top-up date (pipeline runs + agent runs)
+            cur.execute(
+                "SELECT COALESCE(SUM(cost_usd), 0) FROM pipeline_runs WHERE started_at::date >= %s",
+                (first_date,),
+            )
+            pipeline_spent = float(cur.fetchone()[0])
+
+            # Also count from agent_runs table (external projects like Climate)
+            cur.execute(
+                "SELECT COALESCE(SUM(cost_usd), 0) FROM agent_runs WHERE run_at::date >= %s",
+                (first_date,),
+            )
+            agent_spent = float(cur.fetchone()[0])
+
+        total_spent = pipeline_spent + agent_spent
+        estimated = max(0.0, total_topup - total_spent)
+        pct = (estimated / total_topup * 100) if total_topup > 0 else 0
+
+        return {
+            "configured": True,
+            "total_topup": round(total_topup, 4),
+            "total_spent": round(total_spent, 4),
+            "pipeline_spent": round(pipeline_spent, 4),
+            "agent_spent": round(agent_spent, 4),
+            "estimated_remaining": round(estimated, 4),
+            "percent_remaining": round(pct, 1),
+            "since_date": first_date.isoformat() if first_date else None,
+            "topups": topups,
+        }
+    except Exception as e:
+        return {"configured": False, "error": str(e)}
     finally:
         c.close()
 

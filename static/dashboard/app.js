@@ -49,35 +49,89 @@ async function loadCredits() {
   const data = await apiFetch('/dashboard/credits');
   if (!data) return;
 
-  const el = document.getElementById('credits-remaining');
-  const bar = document.getElementById('credits-bar');
+  const el    = document.getElementById('credits-remaining');
+  const bar   = document.getElementById('credits-bar');
   const detail = document.getElementById('credits-detail');
-  const sub = document.getElementById('credits-sub');
+  const sub   = document.getElementById('credits-sub');
+  const stats = document.getElementById('credits-stats');
 
-  if (data.source === 'not_configured') {
-    el.textContent = 'N/C';
-    detail.textContent = 'Configure ANTHROPIC_CREDIT_BALANCE no .env ou use o campo ao lado';
+  if (!data.configured) {
+    el.textContent = '—';
+    detail.textContent = 'Registre a primeira recarga para ativar o monitoramento de saldo.';
+    stats.innerHTML = '';
+    renderTopupHistory(data.topups || []);
     return;
   }
 
   const rem = data.estimated_remaining;
   const pct = data.percent_remaining;
   el.textContent = fmt$(rem);
-  sub.textContent = `estimado restante (${pct}%)`;
+  sub.textContent = `estimado restante (${pct.toFixed(1)}%)`;
 
-  const cls = pct < 10 ? 'danger' : pct < 30 ? 'warn' : '';
+  const cls = pct < 10 ? 'danger' : pct < 25 ? 'warn' : '';
   el.className = 'credits-remaining ' + cls;
   bar.className = 'credits-bar ' + cls;
-  bar.style.width = pct + '%';
+  bar.style.width = Math.min(pct, 100) + '%';
+  detail.textContent = `Monitoramento desde ${data.since_date}`;
 
-  detail.textContent = `Gasto desde ${data.updated_at}: ${fmt$(data.spent_since_topup)} | Saldo informado: ${fmt$(data.known_balance)}`;
+  stats.innerHTML = `
+    <div class="credits-stat-row"><span class="credits-stat-label">Total recarregado</span><span class="credits-stat-value">${fmt$(data.total_topup)}</span></div>
+    <div class="credits-stat-row"><span class="credits-stat-label">Gasto (pipeline)</span><span class="credits-stat-value" style="color:var(--orange)">${fmt$(data.pipeline_spent)}</span></div>
+    <div class="credits-stat-row"><span class="credits-stat-label">Gasto (projetos ext.)</span><span class="credits-stat-value" style="color:var(--orange)">${fmt$(data.agent_spent)}</span></div>
+    <div class="credits-stat-row"><span class="credits-stat-label">Total gasto</span><span class="credits-stat-value" style="color:var(--red)">${fmt$(data.total_spent)}</span></div>
+  `;
+
+  renderTopupHistory(data.topups || []);
 }
 
-async function updateCredits() {
-  const val = parseFloat(document.getElementById('credits-input').value);
-  if (!val || isNaN(val)) return;
-  await apiFetch(`/dashboard/credits/update?balance=${val}`, { method: 'POST' });
-  document.getElementById('credits-input').value = '';
+function renderTopupHistory(topups) {
+  const el = document.getElementById('topup-history');
+  if (!topups.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <table class="topup-table">
+      <thead><tr><th>Data</th><th>Valor</th><th>Observação</th><th></th></tr></thead>
+      <tbody>
+        ${topups.map(t => `
+          <tr>
+            <td>${t.topup_date}</td>
+            <td class="amount">${fmt$(t.amount_usd)}</td>
+            <td style="color:var(--muted)">${t.notes || '—'}</td>
+            <td><button class="del-btn" onclick="deleteTopup(${t.id})">✕</button></td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function toggleTopupForm() {
+  const f = document.getElementById('topup-form');
+  f.classList.toggle('hidden');
+  if (!f.classList.contains('hidden')) {
+    document.getElementById('topup-date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('topup-amount').focus();
+  }
+}
+
+async function saveTopup() {
+  const date   = document.getElementById('topup-date').value;
+  const amount = parseFloat(document.getElementById('topup-amount').value);
+  const notes  = document.getElementById('topup-notes').value;
+  if (!date || !amount || isNaN(amount) || amount <= 0) {
+    alert('Informe data e valor válidos.');
+    return;
+  }
+  await apiFetch('/dashboard/credits/topups', {
+    method: 'POST',
+    body: JSON.stringify({ amount_usd: amount, topup_date: date, notes })
+  });
+  document.getElementById('topup-amount').value = '';
+  document.getElementById('topup-notes').value = '';
+  document.getElementById('topup-form').classList.add('hidden');
+  await loadCredits();
+}
+
+async function deleteTopup(id) {
+  if (!confirm('Remover esta recarga?')) return;
+  await apiFetch(`/dashboard/credits/topups/${id}`, { method: 'DELETE' });
   await loadCredits();
 }
 
