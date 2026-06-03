@@ -89,18 +89,23 @@
   <div id="topup-history"></div>
 </section>
 
-<!-- Active runs -->
+<!-- Kanban pipeline -->
 <section>
   <div class="section-header">
-    <h2>Execuções ativas</h2>
-    <span class="dot-live"></span>
+    <h2>Pipeline — visão de estágios</h2>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span class="dot-live"></span>
+      <select id="kanban-filter" onchange="renderKanban()">
+        <option value="">Todos os projetos</option>
+        <option value="expansao">Expansão AI</option>
+        <option value="cwi">CWI Software</option>
+      </select>
+    </div>
   </div>
-  <div id="active-runs" class="runs-list empty-state">
-    <p>Nenhuma execução ativa no momento.</p>
-  </div>
+  <div class="kanban-board" id="kanban-board"></div>
 </section>
 
-<!-- Recent runs -->
+<!-- Runs list -->
 <section>
   <div class="section-header">
     <h2>Histórico de execuções</h2>

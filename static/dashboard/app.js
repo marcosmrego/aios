@@ -141,28 +141,18 @@ async function loadRuns() {
   if (!data) return;
   allRuns = data;
   renderRuns();
+  renderKanban();
 }
 
 function renderRuns() {
   const filter = document.getElementById('filter-project').value;
   const runs = filter ? allRuns.filter(r => r.project === filter) : allRuns;
-  const active = runs.filter(r => r.status === 'running');
-  const recent = runs.filter(r => r.status !== 'running');
 
-  // Active
-  const activeEl = document.getElementById('active-runs');
-  if (active.length === 0) {
-    activeEl.innerHTML = '<p class="empty-state">Nenhuma execução ativa no momento.</p>';
-  } else {
-    activeEl.innerHTML = active.map(runCard).join('');
-  }
-
-  // Recent
   const listEl = document.getElementById('runs-list');
-  if (recent.length === 0) {
+  if (!runs.length) {
     listEl.innerHTML = '<p class="empty-state">Nenhuma execução encontrada.</p>';
   } else {
-    listEl.innerHTML = recent.map(runCard).join('');
+    listEl.innerHTML = runs.map(runCard).join('');
   }
 }
 
@@ -172,6 +162,101 @@ const STAGE_LABELS = {
   ceo: 'CEO', pm: 'PM', architect: 'Arch', dev: 'Dev', qa: 'QA', devops: 'DevOps', marketing: 'Mktg',
   'meeting-secretary': 'Secretary', pmo: 'PMO', 'agile-coach': 'Agile', product: 'Product', 'exec-reporting': 'Exec'
 };
+
+// ── Kanban board ─────────────────────────────────────────────────────────────
+function renderKanban() {
+  const filter = document.getElementById('kanban-filter').value;
+  const runs = filter ? allRuns.filter(r => r.project === filter) : allRuns;
+  const board = document.getElementById('kanban-board');
+
+  // Build columns: one per stage + "Concluído"
+  const cols = [...STAGES_EXPANSAO, '__done__'];
+  const colCards = Object.fromEntries(cols.map(c => [c, []]));
+
+  for (const run of runs) {
+    const col = _kanbanColumn(run);
+    if (colCards[col] !== undefined) colCards[col].push(run);
+  }
+
+  board.innerHTML = cols.map(col => {
+    const cards = colCards[col];
+    const label = col === '__done__' ? '✅ Concluído' : (STAGE_LABELS[col] || col);
+    const hasFailed = cards.some(r => r.status === 'failed' && _kanbanColumn(r) === col);
+    const hasActive = cards.some(r => r.status === 'running');
+    const colCls = hasActive ? 'active' : hasFailed ? 'has-failed' : col === '__done__' ? 'done-col' : '';
+    return `
+      <div class="kb-col ${colCls}">
+        <div class="kb-col-head">
+          <div class="kb-col-name">${label}</div>
+          <div class="kb-col-count">${cards.length} run${cards.length !== 1 ? 's' : ''}</div>
+        </div>
+        <div class="kb-col-body">
+          ${cards.map(r => _kbCard(r, col)).join('') || '<div style="padding:8px;font-size:.7rem;color:var(--muted);text-align:center">—</div>'}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function _kanbanColumn(run) {
+  if (run.status === 'completed') return '__done__';
+
+  // Find the deepest active or failed stage
+  const stages = run.stages || [];
+  const order = run.pipeline === 'cwi' ? STAGES_CWI : STAGES_EXPANSAO;
+
+  // If running: use current_stage
+  if (run.status === 'running' && run.current_stage) return run.current_stage;
+
+  // Failed/paused: find the last non-skipped stage that ran
+  for (let i = order.length - 1; i >= 0; i--) {
+    const s = stages.find(st => st.stage_name === order[i]);
+    if (s && ['running', 'failed', 'completed'].includes(s.status)) return order[i];
+  }
+
+  // Fallback: first stage
+  return order[0] || 'ceo';
+}
+
+function _kbCard(run, col) {
+  const cardCls = run.status === 'running' ? 'running'
+    : run.status === 'completed' ? 'completed'
+    : run.status === 'paused' ? 'paused'
+    : 'failed';
+
+  const proj = { expansao: 'Expansão AI', cwi: 'CWI', climate: 'Climate', 'grc-flow': 'GRC Flow' }[run.project] || run.project;
+  const shortId = run.run_id.replace('hist-', '').slice(0, 8);
+  const elapsed = run.started_at ? _elapsed(new Date(run.started_at), run.completed_at ? new Date(run.completed_at) : new Date()) : '';
+
+  // Find blocker info for failed runs
+  let blocker = '';
+  if (run.status === 'failed' && run.stages) {
+    const failedStage = run.stages.find(s => s.status === 'failed');
+    const errMsg = failedStage?.error_msg || run.error_msg || '';
+    if (errMsg) blocker = `<div class="kb-card-blocker">⚠ ${errMsg.slice(0, 60)}${errMsg.length > 60 ? '…' : ''}</div>`;
+    else if (col !== '__done__') blocker = `<div class="kb-card-blocker">⚠ Parou neste estágio</div>`;
+  }
+
+  const gates = (run.gates || []).filter(g => g.decision === 'pending');
+  const gateAlert = gates.length ? `<div class="kb-card-blocker" style="color:var(--yellow)">🚦 Gate pendente</div>` : '';
+
+  return `
+    <div class="kb-card ${cardCls}" onclick="openRun('${run.run_id}')">
+      <div class="kb-card-project">${proj}</div>
+      <div class="kb-card-id">${shortId}</div>
+      <div class="kb-card-cost">${fmt$(run.cost_usd || 0)}</div>
+      <div class="kb-card-time">${elapsed}</div>
+      <span class="kb-card-status ${cardCls}">${run.status}</span>
+      ${blocker}${gateAlert}
+    </div>`;
+}
+
+function _elapsed(start, end) {
+  const ms = end - start;
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s/60)}m`;
+  return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
+}
 
 function stageClass(stages, name, currentStage, runStatus) {
   const s = (stages || []).find(st => st.stage_name === name);
@@ -288,7 +373,7 @@ function connectSSE() {
   es.onmessage = (e) => {
     const evt = JSON.parse(e.data);
     if (evt.type === 'run_update' || evt.type === 'stage_update' || evt.type === 'gate_decision') {
-      loadRuns();
+      loadRuns();  // also calls renderKanban()
       loadCosts();
       if (currentRunId === evt.run_id) openRun(evt.run_id);
     }
