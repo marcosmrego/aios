@@ -29,7 +29,7 @@ _STAGE_PREFIXES = {
 }
 
 
-def run_pipeline(extra_context: str = "", start_from: str = "ceo", force: bool = False) -> None:
+def run_pipeline(extra_context: str = "", start_from: str = "ceo", force: bool = False, project: str | None = None) -> None:
     """
     Run the full AIOS pipeline: CEO -> PM -> Architect -> Dev -> QA -> DevOps -> Marketing.
 
@@ -41,7 +41,10 @@ def run_pipeline(extra_context: str = "", start_from: str = "ceo", force: bool =
 
     # ── Register run in dashboard DB ──────────────────────────────────────────
     _current_run_id = new_run_id()
-    start_run(_current_run_id, project="expansao", pipeline="expansao", extra_context=extra_context)
+    run_project = project or "expansao"
+    start_run(_current_run_id, project=run_project, pipeline="expansao", extra_context=extra_context)
+    if project:
+        console.print(f"[dim]Escopo: projeto '{project}'[/]")
     emit_event({"type": "run_update", "run_id": _current_run_id, "status": "running"})
 
     # ── Smart resume: skip stages that already have valid outputs ─────────────
@@ -77,7 +80,7 @@ def run_pipeline(extra_context: str = "", start_from: str = "ceo", force: bool =
         start_stage(_current_run_id, "ceo")
         emit_event({"type": "stage_update", "run_id": _current_run_id, "stage": "ceo", "status": "running"})
         from orchestrator.agents.ceo_agent import CEOAgent  # noqa: PLC0415
-        ceo_output = CEOAgent().run(extra_context=extra_context, force=force)
+        ceo_output = CEOAgent().run(extra_context=extra_context, force=force, project=project)
         _stage_done(_current_run_id, "ceo", ceo_output)
         if not ceo_output.get("human_approved"):
             console.print("[red bold]Pipeline stopped at CEO->PM gate.[/]")

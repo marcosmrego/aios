@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS pipeline_stories (
     story_id    VARCHAR(20)  NOT NULL,
     title       TEXT         DEFAULT '',
     project     VARCHAR(50)  DEFAULT 'expansao',
+    epic_id     VARCHAR(50)  DEFAULT '',
+    epic_title  TEXT         DEFAULT '',
     prd_title   TEXT         DEFAULT '',
     status      VARCHAR(20)  NOT NULL DEFAULT 'backlog',
     dev_files   INTEGER      DEFAULT 0,
@@ -22,6 +24,14 @@ CREATE TABLE IF NOT EXISTS pipeline_stories (
     updated_at  TIMESTAMPTZ  DEFAULT NOW(),
     UNIQUE(sprint, story_id)
 );
+
+-- Safe migration for existing tables
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='pipeline_stories' AND column_name='epic_id') THEN
+        ALTER TABLE pipeline_stories ADD COLUMN epic_id VARCHAR(50) DEFAULT '';
+        ALTER TABLE pipeline_stories ADD COLUMN epic_title TEXT DEFAULT '';
+    END IF;
+END $$;
 """
 
 _CREATE_CREDITS_SQL = """
@@ -321,7 +331,8 @@ def get_run_detail(run_id: str) -> dict | None:
 
 
 def upsert_story(sprint: str, story_id: str, title: str = "", project: str = "expansao",
-                 prd_title: str = "", status: str = "backlog", dev_files: int = 0,
+                 epic_id: str = "", epic_title: str = "", prd_title: str = "",
+                 status: str = "backlog", dev_files: int = 0,
                  qa_result: str = "", qa_notes: str = "") -> None:
     c = _conn()
     if not c:
@@ -330,14 +341,17 @@ def upsert_story(sprint: str, story_id: str, title: str = "", project: str = "ex
         with c.cursor() as cur:
             cur.execute("""
                 INSERT INTO pipeline_stories
-                    (sprint, story_id, title, project, prd_title, status, dev_files, qa_result, qa_notes, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                    (sprint, story_id, title, project, epic_id, epic_title, prd_title,
+                     status, dev_files, qa_result, qa_notes, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
                 ON CONFLICT (sprint, story_id) DO UPDATE SET
-                    title=EXCLUDED.title, prd_title=EXCLUDED.prd_title,
-                    status=EXCLUDED.status, dev_files=EXCLUDED.dev_files,
-                    qa_result=EXCLUDED.qa_result, qa_notes=EXCLUDED.qa_notes,
-                    updated_at=NOW()
-            """, (sprint, story_id, title, project, prd_title, status, dev_files, qa_result, qa_notes))
+                    title=EXCLUDED.title, project=EXCLUDED.project,
+                    epic_id=EXCLUDED.epic_id, epic_title=EXCLUDED.epic_title,
+                    prd_title=EXCLUDED.prd_title, status=EXCLUDED.status,
+                    dev_files=EXCLUDED.dev_files, qa_result=EXCLUDED.qa_result,
+                    qa_notes=EXCLUDED.qa_notes, updated_at=NOW()
+            """, (sprint, story_id, title, project, epic_id, epic_title, prd_title,
+                  status, dev_files, qa_result, qa_notes))
         c.commit()
     except Exception:
         c.rollback()

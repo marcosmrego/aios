@@ -75,6 +75,11 @@ main { max-width: 1100px; margin: 0 auto; padding: 24px; display: flex; flex-dir
 .topup-table .del-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: .8rem; padding: 2px 6px; border-radius: 4px; }
 .topup-table .del-btn:hover { color: var(--red); background: rgba(248,81,73,.1); }
 
+/* Stories filters */
+.stories-filters { display: flex; gap: 10px; margin: 14px 0 10px; flex-wrap: wrap; }
+.stories-filters select { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 6px 10px; font-size: .85rem; outline: none; }
+.stories-filters select:focus { border-color: var(--blue); }
+
 /* Section */
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-header h2 { font-size: 1rem; font-weight: 600; }

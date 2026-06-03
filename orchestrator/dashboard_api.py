@@ -134,9 +134,13 @@ def get_costs(user: str = Depends(_auth)) -> dict:
 
 
 @router.get("/stories")
-def list_stories(sprint: str | None = None, user: str = Depends(_auth)) -> list[dict]:
+def list_stories(sprint: str | None = None, project: str | None = None,
+                 user: str = Depends(_auth)) -> list[dict]:
     from tools.run_tracker import get_stories  # noqa: PLC0415
-    return _serialize(get_stories(sprint=sprint))
+    stories = get_stories(sprint=sprint)
+    if project:
+        stories = [s for s in stories if s.get("project") == project]
+    return _serialize(stories)
 
 
 @router.get("/stories/sprints")

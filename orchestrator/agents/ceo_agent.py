@@ -26,26 +26,31 @@ class CEOAgent(BaseAgent):
         super().__init__()
         self.notion = NotionClient()
 
-    def run(self, extra_context: str = "", force: bool = False) -> dict[str, Any]:
+    def run(self, extra_context: str = "", force: bool = False, project: str | None = None) -> dict[str, Any]:
         """Execute the CEO Agent: read backlog -> generate plan -> persist -> gate."""
         console.rule("[bold]CEO Agent")
 
         week = date.today().strftime("%Y-W%V")
+        cache_key = f"{week}_{project or 'all'}"
 
         # 0. Return cached plan if already approved this week (skip expensive Opus call)
         if not force:
-            cached = self._load_cached(week)
+            cached = self._load_cached(cache_key)
             if cached:
+                scope = f"projeto '{project}'" if project else "todos os projetos"
                 console.print(
-                    f"[dim]Plano da semana {week} já existe — reutilizando. "
+                    f"[dim]Plano da semana {week} ({scope}) já existe — reutilizando. "
                     f"Use --force para regenerar.[/]"
                 )
                 cached.setdefault("human_approved", True)
                 return cached
 
-        # 1. Fetch backlog from Notion
-        console.print("Fetching backlog from Notion...")
-        backlog_items = self.notion.get_backlog()
+        # 1. Fetch backlog from Notion (scoped by project if specified)
+        scope_label = f"projeto '{project}'" if project else "todos os projetos"
+        console.print(f"Fetching backlog from Notion ({scope_label})...")
+        backlog_items = self.notion.get_backlog(project=project)
+        if not backlog_items:
+            console.print(f"[yellow]Nenhum item no backlog para {scope_label}.[/]")
         backlog_text = json.dumps(backlog_items, ensure_ascii=False, indent=2)
 
         # 2. Build prompt
@@ -73,7 +78,8 @@ no formato especificado no system prompt. Inclua o JSON de output ao final da su
         output = self._parse_json_output(response_text)
 
         # 5. Persist output
-        filename = f"ceo_plan_{week.replace('-', '_')}.json"
+        safe_key = cache_key.replace("-", "_").replace(" ", "_")
+        filename = f"ceo_plan_{safe_key}.json"
         self._save_output(output, filename)
 
         # 6. Save to Notion (sprint page)
@@ -101,11 +107,11 @@ no formato especificado no system prompt. Inclua o JSON de output ao final da su
         return output
 
     @staticmethod
-    def _load_cached(week: str) -> dict[str, Any] | None:
-        """Return existing CEO output for this week if it exists and is valid."""
+    def _load_cached(cache_key: str) -> dict[str, Any] | None:
+        """Return existing CEO output for this week+project if it exists and is valid."""
         from pathlib import Path  # noqa: PLC0415
         out_dir = Path("outputs/")
-        safe = week.replace("-", "_")
+        safe = cache_key.replace("-", "_").replace(" ", "_")
         files = sorted(out_dir.glob(f"ceo_plan_{safe}.json"), key=lambda p: p.stat().st_mtime, reverse=True)
         if not files:
             return None

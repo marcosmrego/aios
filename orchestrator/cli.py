@@ -20,10 +20,12 @@ def run(
     input_file: str = typer.Option("", "--input", "-i", help="Arquivo de input para o agente"),
     input_text: str = typer.Option("", "--input-text", "-t", help="Texto livre como input (spec/diagram)"),
     force: bool = typer.Option(False, "--force", "-f", help="Reprocessar tudo do zero, ignorando outputs existentes"),
+    project: str = typer.Option("", "--project", "-proj", help="Escopo do pipeline: climate | grc-flow | aios | cwi"),
 ) -> None:
     """Run a pipeline or a specific agent. Use --pipeline to select: expansao (default) or cwi.
 
-    Por padrao o pipeline retoma automaticamente do ponto onde parou (outputs existentes sao reutilizados).
+    Use --project para restringir o backlog a um projeto especifico (ex: --project climate).
+    Por padrao o pipeline retoma automaticamente do ponto onde parou.
     Use --force para reprocessar tudo do zero.
     """
     if pipeline not in _PIPELINES:
@@ -41,7 +43,12 @@ def run(
 
     if agent == "all":
         from orchestrator.pipeline import run_pipeline  # noqa: PLC0415
-        run_pipeline(extra_context=context, start_from=start_from or "ceo", force=force)
+        run_pipeline(
+            extra_context=context,
+            start_from=start_from or "ceo",
+            force=force,
+            project=project or None,
+        )
         return
 
     agent_map = {

@@ -447,19 +447,56 @@ const STORY_COLS = [
   { key: 'done',        label: '🏁 Concluído',     cls: 'done-col' },
 ];
 
+let _allStories = [];
+
 async function loadStories() {
-  // Load sprints into selector
-  const sprints = await apiFetch('/dashboard/stories/sprints');
-  const sel = document.getElementById('story-sprint-filter');
-  if (sprints && sprints.length) {
-    sel.innerHTML = sprints.map(s => `<option value="${s}">${s}</option>`).join('');
+  // Load sprints into selector (once)
+  const sprintSel = document.getElementById('story-sprint-filter');
+  if (sprintSel.options.length <= 1) {
+    const sprints = await apiFetch('/dashboard/stories/sprints');
+    if (sprints && sprints.length) {
+      sprintSel.innerHTML = `<option value="">Todos</option>` +
+        sprints.map(s => `<option value="${s}">${s}</option>`).join('');
+      if (sprints.length) sprintSel.value = sprints[0]; // default to latest
+    }
   }
 
-  const sprint = sel.value;
+  const sprint  = sprintSel.value;
   const url = sprint ? `/dashboard/stories?sprint=${sprint}` : '/dashboard/stories';
   const stories = await apiFetch(url);
   if (!stories) return;
-  renderStoriesKanban(stories);
+  _allStories = stories;
+  updateEpicFilter(stories);
+  renderStoriesKanban(filterStories(stories));
+}
+
+function filterStories(stories) {
+  const project = document.getElementById('filter-story-project').value;
+  const epic    = document.getElementById('filter-story-epic').value;
+  return stories.filter(s =>
+    (!project || s.project === project) &&
+    (!epic    || s.epic_id === epic)
+  );
+}
+
+function updateEpicFilter(stories) {
+  const project = document.getElementById('filter-story-project').value;
+  const epics = [...new Map(
+    stories
+      .filter(s => !project || s.project === project)
+      .map(s => [s.epic_id, s.epic_title || s.epic_id])
+  ).entries()];
+
+  const sel = document.getElementById('filter-story-epic');
+  const current = sel.value;
+  sel.innerHTML = `<option value="">Todos os épicos</option>` +
+    epics.map(([id, title]) => `<option value="${id}">${id} — ${title}</option>`).join('');
+  if (epics.find(([id]) => id === current)) sel.value = current;
+}
+
+function onStoryFilterChange() {
+  updateEpicFilter(_allStories);
+  renderStoriesKanban(filterStories(_allStories));
 }
 
 function renderStoriesKanban(stories) {

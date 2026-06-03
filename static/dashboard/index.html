@@ -50,10 +50,19 @@
 
 <!-- ── Aba 1: User Stories ───────────────────────────────────────── -->
 <div id="panel-stories">
-  <div class="section-header" style="margin-top:14px">
-    <span style="color:var(--muted);font-size:.85rem">Cada card = uma User Story</span>
+  <div class="stories-filters">
+    <select id="filter-story-project" onchange="onStoryFilterChange()">
+      <option value="">Todos os projetos</option>
+      <option value="climate">🌦 Climate</option>
+      <option value="grc-flow">📋 GRC Flow</option>
+      <option value="aios">⚡ AIOS</option>
+      <option value="cwi">🏢 CWI</option>
+    </select>
+    <select id="filter-story-epic" onchange="loadStories()">
+      <option value="">Todos os épicos</option>
+    </select>
     <select id="story-sprint-filter" onchange="loadStories()">
-      <option value="">Carregando...</option>
+      <option value="">Sprint atual</option>
     </select>
   </div>
   <div class="kanban-board" id="stories-board"></div>

@@ -47,23 +47,33 @@ class NotionClient:
     # Backlog
     # ------------------------------------------------------------------
 
-    def get_backlog(self, status_filter: list[str] | None = None) -> list[dict[str, Any]]:
-        """Return all backlog items, optionally filtered by status."""
-        filters: list[dict[str, Any]] = []
+    def get_backlog(
+        self,
+        status_filter: list[str] | None = None,
+        project: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return backlog items, optionally filtered by status and/or project."""
+        and_filters: list[dict[str, Any]] = []
+
         if status_filter:
-            filters = [
-                {
-                    "property": "Status",
-                    "select": {"equals": s},
-                }
+            status_conditions = [
+                {"property": "Status", "select": {"equals": s}}
                 for s in status_filter
             ]
+            and_filters.append(
+                {"or": status_conditions} if len(status_conditions) > 1 else status_conditions[0]
+            )
+
+        if project:
+            and_filters.append({"property": "Project", "select": {"equals": project}})
 
         body: dict[str, Any] = {
             "sorts": [{"property": "Priority", "direction": "descending"}],
         }
-        if filters:
-            body["filter"] = {"or": filters} if len(filters) > 1 else filters[0]
+        if len(and_filters) == 1:
+            body["filter"] = and_filters[0]
+        elif len(and_filters) > 1:
+            body["filter"] = {"and": and_filters}
 
         results = self._post(
             f"/databases/{settings.notion_backlog_db_id}/query", body
