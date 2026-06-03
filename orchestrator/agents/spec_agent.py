@@ -177,7 +177,7 @@ ITEM:
 
 Retorne apenas o JSON da especificacao, sem texto adicional."""
 
-        response_text = self._run(user_message, max_tokens=8192)
+        response_text = self._run(user_message, max_tokens=16384)
         return self._parse_json_output(response_text)
 
     # ── Merge ─────────────────────────────────────────────────────────────────

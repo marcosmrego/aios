@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIOS Dashboard — Login</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0d1117;color:#e6edf3;font-family:'Inter',system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}
+  .card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:40px;width:360px}
+  .logo{text-align:center;margin-bottom:32px}
+  .logo h1{font-size:1.5rem;font-weight:700;color:#58a6ff}
+  .logo p{color:#8b949e;font-size:.85rem;margin-top:4px}
+  label{display:block;font-size:.8rem;color:#8b949e;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
+  input{width:100%;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:10px 12px;font-size:.95rem;margin-bottom:16px;outline:none;transition:border .2s}
+  input:focus{border-color:#58a6ff}
+  button{width:100%;background:#238636;border:none;border-radius:6px;color:#fff;padding:11px;font-size:.95rem;font-weight:600;cursor:pointer;transition:background .2s}
+  button:hover{background:#2ea043}
+  .error{color:#f85149;font-size:.85rem;text-align:center;margin-top:12px;display:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <h1>⚡ AIOS</h1>
+    <p>Expansão AI OS — Dashboard</p>
+  </div>
+  <label>Usuário</label>
+  <input type="text" id="user" placeholder="marcos" autofocus>
+  <label>Senha</label>
+  <input type="password" id="pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()">
+  <button onclick="login()">Entrar</button>
+  <p class="error" id="err">Usuário ou senha inválidos.</p>
+</div>
+<script>
+async function login() {
+  const user = document.getElementById('user').value;
+  const pass = document.getElementById('pass').value;
+  const res = await fetch('/dashboard/login', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({username: user, password: pass})
+  });
+  if (res.ok) {
+    const data = await res.json();
+    localStorage.setItem('aios_token', data.token);
+    localStorage.setItem('aios_user', data.user);
+    window.location.href = '/dashboard/';
+  } else {
+    document.getElementById('err').style.display = 'block';
+  }
+}
+</script>
+</body>
+</html>

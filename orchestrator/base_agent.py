@@ -36,19 +36,55 @@ class BaseAgent:
         return path.read_text(encoding="utf-8")
 
     def _run(self, user_message: str, max_tokens: int = 4096) -> str:
-        """Send a message to Claude and return the text response."""
-        console.print(f"[bold blue]>> {self.name}[/] thinking...", end=" ")
-        t0 = time.monotonic()
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=max_tokens,
-            system=self._system_prompt,
-            messages=[{"role": "user", "content": user_message}],
-        )
+        """Send a message to Claude via streaming and return the full text response.
+
+        Retries up to 3 times on transient network errors with exponential backoff.
+        """
+        import httpx  # noqa: PLC0415
+
+        _NETWORK_ERRORS = (httpx.ReadError, httpx.ConnectError, httpx.RemoteProtocolError, httpx.ReadTimeout)
+        _MAX_ATTEMPTS = 4
+
+        for attempt in range(_MAX_ATTEMPTS):
+            try:
+                console.print(f"[bold blue]>> {self.name}[/] thinking...", end=" ")
+                t0 = time.monotonic()
+
+                full_text = ""
+                with self.client.messages.stream(
+                    model=self.model,
+                    max_tokens=max_tokens,
+                    system=self._system_prompt,
+                    messages=[{"role": "user", "content": user_message}],
+                ) as stream:
+                    for chunk in stream.text_stream:
+                        full_text += chunk
+                    final_message = stream.get_final_message()
+
+                break  # success — exit retry loop
+
+            except _NETWORK_ERRORS as exc:
+                if attempt < _MAX_ATTEMPTS - 1:
+                    wait = 2 ** attempt
+                    console.print(f"[yellow]network error ({exc.__class__.__name__}) — retry {attempt + 1} in {wait}s[/]")
+                    time.sleep(wait)
+                else:
+                    raise
+
+            except anthropic.APIStatusError as exc:
+                is_overloaded = "overloaded" in str(exc).lower()
+                is_rate_limit = exc.status_code in (429, 529)
+                if (is_overloaded or is_rate_limit) and attempt < _MAX_ATTEMPTS - 1:
+                    wait = 15 * (attempt + 1)  # longer backoff for capacity issues
+                    console.print(f"[yellow]API overloaded — retry {attempt + 1} in {wait}s[/]")
+                    time.sleep(wait)
+                else:
+                    raise
+
         duration_ms = int((time.monotonic() - t0) * 1000)
         console.print("[green]done[/]")
 
-        usage = response.usage
+        usage = final_message.usage
         cost = estimate_cost(self.model, usage.input_tokens, usage.output_tokens)
         console.print(
             f"[dim]  tokens: {usage.input_tokens}↑ {usage.output_tokens}↓  "
@@ -56,7 +92,7 @@ class BaseAgent:
         )
         try:
             log_run(
-                project=self.pipeline,  # pipeline doubles as project for AIOS agents
+                project=self.pipeline,
                 pipeline=self.pipeline,
                 agent_name=self.name,
                 model=self.model,
@@ -68,15 +104,27 @@ class BaseAgent:
         except Exception:
             pass  # tracking must never break agent execution
 
-        return response.content[0].text  # type: ignore[union-attr]
+        return full_text
 
     def _parse_json_output(self, text: str) -> dict[str, Any]:
-        """Extract the first JSON block from the agent's response."""
-        start = text.find("{")
-        end = text.rfind("}") + 1
-        if start == -1 or end == 0:
+        """Extract the last valid top-level JSON object from the agent's response."""
+        decoder = json.JSONDecoder()
+        last_obj: dict[str, Any] | None = None
+        i = 0
+        while i < len(text):
+            if text[i] == "{":
+                try:
+                    obj, end = decoder.raw_decode(text, i)
+                    if isinstance(obj, dict):
+                        last_obj = obj
+                    i = end
+                    continue
+                except json.JSONDecodeError:
+                    pass
+            i += 1
+        if last_obj is None:
             raise ValueError(f"No JSON found in agent output:\n{text[:500]}")
-        return json.loads(text[start:end])
+        return last_obj
 
     def _save_output(self, data: dict[str, Any], filename: str) -> Path:
         """Persist agent output to the outputs directory."""

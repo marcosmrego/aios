@@ -26,9 +26,22 @@ class CEOAgent(BaseAgent):
         super().__init__()
         self.notion = NotionClient()
 
-    def run(self, extra_context: str = "") -> dict[str, Any]:
+    def run(self, extra_context: str = "", force: bool = False) -> dict[str, Any]:
         """Execute the CEO Agent: read backlog -> generate plan -> persist -> gate."""
         console.rule("[bold]CEO Agent")
+
+        week = date.today().strftime("%Y-W%V")
+
+        # 0. Return cached plan if already approved this week (skip expensive Opus call)
+        if not force:
+            cached = self._load_cached(week)
+            if cached:
+                console.print(
+                    f"[dim]Plano da semana {week} já existe — reutilizando. "
+                    f"Use --force para regenerar.[/]"
+                )
+                cached.setdefault("human_approved", True)
+                return cached
 
         # 1. Fetch backlog from Notion
         console.print("Fetching backlog from Notion...")
@@ -36,7 +49,6 @@ class CEOAgent(BaseAgent):
         backlog_text = json.dumps(backlog_items, ensure_ascii=False, indent=2)
 
         # 2. Build prompt
-        week = date.today().strftime("%Y-W%V")
         user_message = f"""
 ## Dados do Backlog (Notion)
 ```json
@@ -53,7 +65,7 @@ Por favor, analise o backlog, defina as prioridades da semana e gere o plano sem
 no formato especificado no system prompt. Inclua o JSON de output ao final da sua resposta.
 """
         # 3. Run Claude
-        response_text = self._run(user_message, max_tokens=4096)
+        response_text = self._run(user_message, max_tokens=16384)
         console.print("\n[dim]--- CEO Agent output preview ---[/]")
         console.print(response_text[:800] + ("..." if len(response_text) > 800 else ""))
 
@@ -87,3 +99,20 @@ no formato especificado no system prompt. Inclua o JSON de output ao final da su
             console.print("[green]Plano aprovado. Acionando PM Agent...[/]")
 
         return output
+
+    @staticmethod
+    def _load_cached(week: str) -> dict[str, Any] | None:
+        """Return existing CEO output for this week if it exists and is valid."""
+        from pathlib import Path  # noqa: PLC0415
+        out_dir = Path("outputs/")
+        safe = week.replace("-", "_")
+        files = sorted(out_dir.glob(f"ceo_plan_{safe}.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if not files:
+            return None
+        try:
+            data = json.loads(files[0].read_text(encoding="utf-8"))
+            if data.get("priorities"):  # valid plan has priorities
+                return data
+        except Exception:
+            pass
+        return None

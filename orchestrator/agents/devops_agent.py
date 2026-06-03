@@ -35,11 +35,13 @@ class DevOpsAgent(BaseAgent):
         """Plan and execute deploys using N8N + Coolify."""
         console.rule("[bold]DevOps Agent")
 
-        if not qa_output.get("approved"):
+        # human_approved=True (gate passou) tem precedência sobre approved (avaliação do modelo)
+        gate_passed = qa_output.get("human_approved", qa_output.get("approved", False))
+        if not gate_passed:
             console.print("[red]QA não aprovado. Deploy cancelado.[/]")
             return {"sprint": qa_output.get("sprint"), "deploys": [], "aborted": True}
 
-        sprint = qa_output.get("sprint", "?")
+        sprint = qa_output.get("sprint") or dev_output.get("sprint") or architect_output.get("sprint", "unknown")
         qa_json = json.dumps(qa_output, ensure_ascii=False, indent=2)
         implementations_json = json.dumps(
             dev_output.get("implementations", []), ensure_ascii=False, indent=2
@@ -73,7 +75,7 @@ Planeje e descreva o processo de deploy para cada implementação aprovada.
 Liste os projetos a fazer deploy, migrations a aplicar, health checks e riscos.
 Inclua o JSON de output ao final da sua resposta.
 """
-        response_text = self._run(user_message, max_tokens=4096)
+        response_text = self._run(user_message, max_tokens=16384)
         console.print("\n[dim]--- DevOps Agent output preview ---[/]")
         console.print(response_text[:600] + ("..." if len(response_text) > 600 else ""))
 
@@ -91,7 +93,8 @@ Inclua o JSON de output ao final da sua resposta.
         for deploy in output.get("deploys", []):
             deploy.setdefault("deploy_timestamp", datetime.now(timezone.utc).isoformat())
 
-        filename = f"devops_{sprint.replace('-', '_')}.json"
+        safe_sprint = "".join(c if c.isalnum() or c in "-_" else "_" for c in sprint)
+        filename = f"devops_{safe_sprint}.json"
         self._save_output(output, filename)
 
         # Persist each deploy record to Notion

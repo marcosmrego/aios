@@ -37,7 +37,7 @@ class MarketingAgent(BaseAgent):
             console.print("[yellow]Deploy não foi bem-sucedido. Pulando Marketing Agent.[/]")
             return {"sprint": devops_output.get("sprint"), "content_pieces": [], "skipped": True}
 
-        sprint = devops_output.get("sprint", "?")
+        sprint = devops_output.get("sprint") or pm_output.get("sprint", "unknown")
         deploys_json = json.dumps(devops_output.get("deploys", []), ensure_ascii=False, indent=2)
         prds_json = json.dumps(
             [{"title": p["title"], "stories": p.get("stories", [])} for p in pm_output.get("prds", [])],
@@ -63,13 +63,14 @@ Crie o conteúdo de marketing para LinkedIn e Threads para cada funcionalidade l
 Siga o tom de voz da Expansão AI descrito no system prompt.
 Inclua o JSON de output ao final da sua resposta.
 """
-        response_text = self._run(user_message, max_tokens=4096)
+        response_text = self._run(user_message, max_tokens=16384)
         console.print("\n[dim]--- Marketing Agent output preview ---[/]")
         console.print(response_text[:600] + ("..." if len(response_text) > 600 else ""))
 
         output = self._parse_json_output(response_text)
 
-        filename = f"marketing_{sprint.replace('-', '_')}.json"
+        safe_sprint = "".join(c if c.isalnum() or c in "-_" else "_" for c in sprint)
+        filename = f"marketing_{safe_sprint}.json"
         self._save_output(output, filename)
 
         # Persist content to Notion for review
@@ -92,7 +93,7 @@ Inclua o JSON de output ao final da sua resposta.
             for piece in output.get("content_pieces", []):
                 piece["approved_for_publish"] = True
             console.print("[green]Conteúdo aprovado para publicação![/]")
-            self._save_output(output, f"marketing_{sprint.replace('-', '_')}_approved.json")
+            self._save_output(output, f"marketing_{safe_sprint}_approved.json")
         else:
             console.print("[yellow]Conteúdo rejeitado. Revise e resubmeta manualmente.[/]")
 

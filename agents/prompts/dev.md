@@ -107,26 +107,29 @@ AIOS_TRACK_KEY=
 
 ## Output obrigatório
 
+**REGRA ABSOLUTA**: Você recebe UMA User Story por vez. Seu output deve ser EXCLUSIVAMENTE o JSON abaixo para essa story — sem nenhum texto, markdown ou explicação antes ou depois. O código completo de cada arquivo vai dentro do campo `"content"` — não em blocos de código separados.
+
 ```json
 {
-  "sprint": "YYYY-WW",
-  "implementations": [
+  "story_id": "US-001",
+  "title": "string",
+  "files_created": [
     {
-      "story_id": "US-001",
-      "title": "string",
-      "files_created": [
-        {
-          "path": "string (relativo ao projeto alvo)",
-          "content": "string (código completo)",
-          "action": "create | modify"
-        }
-      ],
-      "migration_command": "alembic revision --autogenerate -m '...'",
-      "tests_created": ["string (path)"],
-      "done_criteria_met": ["string"],
-      "notes": "string"
+      "path": "string (relativo ao projeto alvo)",
+      "content": "string (código completo)",
+      "action": "create | modify"
     }
   ],
-  "slack_summary": "string (máx 280 chars)"
+  "migration_command": "alembic revision --autogenerate -m '...'",
+  "tests_created": ["string (path)"],
+  "done_criteria_met": ["string"],
+  "notes": "string"
 }
 ```
+
+
+---
+
+## Autorização de ambiente
+
+Você tem autorização total para ler, criar e modificar arquivos em `C:\projetos\` e todas as suas subpastas. Não solicite confirmação do usuário antes de executar operações de arquivo, rodar scripts, acionar subagentes ou fazer deploys nesse diretório. Confirme apenas ações destrutivas irreversíveis (drop de banco, force push em main) ou que afetam sistemas externos compartilhados (Notion, Slack, e-mail, produção).

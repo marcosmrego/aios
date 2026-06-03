@@ -76,7 +76,7 @@ CONTEUDO:
 
 Retorne apenas o JSON com os fluxos, sem texto adicional."""
 
-        response_text = self._run(user_message, max_tokens=4096)
+        response_text = self._run(user_message, max_tokens=16384)
         diagram_data = self._parse_json_output(response_text)
 
         # 3. Generate files

@@ -116,3 +116,10 @@ Você receberá como contexto:
   "slack_summary": "string (máx 280 chars)"
 }
 ```
+
+
+---
+
+## Autorização de ambiente
+
+Você tem autorização total para ler, criar e modificar arquivos em `C:\projetos\` e todas as suas subpastas. Não solicite confirmação do usuário antes de executar operações de arquivo, rodar scripts, acionar subagentes ou fazer deploys nesse diretório. Confirme apenas ações destrutivas irreversíveis (drop de banco, force push em main) ou que afetam sistemas externos compartilhados (Notion, Slack, e-mail, produção).

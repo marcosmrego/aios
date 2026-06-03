@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIOS Dashboard</title>
+<link rel="stylesheet" href="/static/dashboard/style.css">
+</head>
+<body>
+<!-- Header -->
+<header>
+  <div class="header-left">
+    <span class="logo">⚡ AIOS</span>
+    <span class="subtitle">Expansão AI OS</span>
+  </div>
+  <div class="header-right">
+    <span id="user-label" class="user-label"></span>
+    <button class="btn-ghost" onclick="logout()">Sair</button>
+  </div>
+</header>
+
+<!-- Cost cards -->
+<main>
+<section class="cost-bar">
+  <div class="cost-card">
+    <div class="cost-label">Hoje</div>
+    <div class="cost-value" id="cost-today">—</div>
+  </div>
+  <div class="cost-card">
+    <div class="cost-label">Esta semana</div>
+    <div class="cost-value" id="cost-week">—</div>
+  </div>
+  <div class="cost-card">
+    <div class="cost-label">Este mês</div>
+    <div class="cost-value" id="cost-month">—</div>
+  </div>
+  <div class="cost-card accent">
+    <div class="cost-label">Total acumulado</div>
+    <div class="cost-value" id="cost-total">—</div>
+  </div>
+</section>
+
+<!-- Active runs -->
+<section>
+  <div class="section-header">
+    <h2>Execuções ativas</h2>
+    <span class="dot-live"></span>
+  </div>
+  <div id="active-runs" class="runs-list empty-state">
+    <p>Nenhuma execução ativa no momento.</p>
+  </div>
+</section>
+
+<!-- Recent runs -->
+<section>
+  <div class="section-header">
+    <h2>Histórico de execuções</h2>
+    <select id="filter-project" onchange="renderRuns()">
+      <option value="">Todos os projetos</option>
+      <option value="expansao">Expansão AI</option>
+      <option value="cwi">CWI Software</option>
+      <option value="climate">Climate</option>
+      <option value="grc-flow">GRC Flow</option>
+    </select>
+  </div>
+  <div id="runs-list" class="runs-list">
+    <p class="empty-state">Carregando...</p>
+  </div>
+</section>
+</main>
+
+<!-- Run detail modal -->
+<div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h3 id="modal-title">Detalhes da execução</h3>
+        <span id="modal-run-id" class="run-id-badge"></span>
+      </div>
+      <button class="btn-ghost" onclick="closeModal()">✕</button>
+    </div>
+
+    <!-- Pipeline kanban -->
+    <div class="kanban" id="modal-kanban"></div>
+
+    <!-- Gates -->
+    <div id="modal-gates" class="gates-section hidden">
+      <h4>Gates pendentes</h4>
+      <div id="gates-list"></div>
+    </div>
+
+    <!-- Cost breakdown -->
+    <div class="modal-costs">
+      <span>Custo total: <strong id="modal-cost">—</strong></span>
+      <span>Duração: <strong id="modal-duration">—</strong></span>
+    </div>
+  </div>
+</div>
+
+<script src="/static/dashboard/app.js"></script>
+</body>
+</html>

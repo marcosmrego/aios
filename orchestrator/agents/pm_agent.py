@@ -72,14 +72,15 @@ Inclua o JSON de output ao final da sua resposta.
 Por favor, escreva os PRDs e User Stories para cada prioridade acima.
 Inclua o JSON de output ao final da sua resposta.
 """
-        response_text = self._run(user_message, max_tokens=8192)
+        response_text = self._run(user_message, max_tokens=32768)
         console.print("\n[dim]--- PM Agent output preview ---[/]")
         console.print(response_text[:800] + ("..." if len(response_text) > 800 else ""))
 
         output = self._parse_json_output(response_text)
 
         # Persist output file
-        filename = f"pm_prds_{sprint.replace('-', '_').replace('W', 'W')}.json"
+        safe_sprint = "".join(c if c.isalnum() or c in "-_" else "_" for c in sprint)
+        filename = f"pm_prds_{safe_sprint}.json"
         self._save_output(output, filename)
 
         # Save each PRD to Notion

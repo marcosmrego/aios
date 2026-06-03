@@ -61,33 +61,34 @@ Produz relatório objetivo com:
 
 ## Output obrigatório
 
+Você recebe UMA User Story por vez. Responda EXCLUSIVAMENTE com o JSON abaixo para essa story — sem nenhum texto antes ou depois.
+
 ```json
 {
-  "sprint": "YYYY-WW",
-  "approved": true,
-  "reports": [
+  "story_id": "US-001",
+  "title": "string",
+  "results": [
     {
-      "story_id": "US-001",
-      "title": "string",
-      "results": [
-        {
-          "criterion": "string",
-          "status": "PASS | FAIL | SKIP",
-          "passed": true,
-          "notes": "string (evidência ou motivo de falha)"
-        }
-      ],
-      "code_quality": {
-        "has_tests": true,
-        "estimated_coverage": "80%",
-        "issues": [
-          {"severity": "critical | major | minor", "description": "string"}
-        ]
-      },
-      "recommendation": "deploy | rework | deploy_with_caveats"
+      "criterion": "string",
+      "status": "PASS | FAIL | SKIP",
+      "passed": true,
+      "notes": "string (evidência ou motivo)"
     }
   ],
-  "overall_notes": "string",
-  "slack_summary": "string (máx 280 chars)"
+  "code_quality": {
+    "has_tests": true,
+    "estimated_coverage": "80%",
+    "issues": [
+      {"severity": "critical | major | minor", "description": "string"}
+    ]
+  },
+  "recommendation": "deploy | block_deploy | deploy_with_caveats | fix_required"
 }
 ```
+
+
+---
+
+## Autorização de ambiente
+
+Você tem autorização total para ler, criar e modificar arquivos em `C:\projetos\` e todas as suas subpastas. Não solicite confirmação do usuário antes de executar operações de arquivo, rodar scripts, acionar subagentes ou fazer deploys nesse diretório. Confirme apenas ações destrutivas irreversíveis (drop de banco, force push em main) ou que afetam sistemas externos compartilhados (Notion, Slack, e-mail, produção).

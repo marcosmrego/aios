@@ -44,13 +44,14 @@ class ArchitectAgent(BaseAgent):
 Analise cada PRD, tome as decisões de arquitetura técnica e gere a documentação completa
 no formato especificado. Inclua o JSON de output ao final da sua resposta.
 """
-        response_text = self._run(user_message, max_tokens=8192)
+        response_text = self._run(user_message, max_tokens=16384)
         console.print("\n[dim]--- Architect Agent output preview ---[/]")
         console.print(response_text[:800] + ("..." if len(response_text) > 800 else ""))
 
         output = self._parse_json_output(response_text)
 
-        filename = f"architect_{sprint.replace('-', '_')}.json"
+        safe_sprint = "".join(c if c.isalnum() or c in "-_" else "_" for c in sprint)
+        filename = f"architect_{safe_sprint}.json"
         self._save_output(output, filename)
 
         # Persist each architecture doc to Notion as a page inside the PRD

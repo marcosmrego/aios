@@ -19,8 +19,13 @@ def run(
     start_from: str = typer.Option("", "--start-from", "-s", help="Retomar pipeline a partir de um agente"),
     input_file: str = typer.Option("", "--input", "-i", help="Arquivo de input para o agente"),
     input_text: str = typer.Option("", "--input-text", "-t", help="Texto livre como input (spec/diagram)"),
+    force: bool = typer.Option(False, "--force", "-f", help="Reprocessar tudo do zero, ignorando outputs existentes"),
 ) -> None:
-    """Run a pipeline or a specific agent. Use --pipeline to select: expansao (default) or cwi."""
+    """Run a pipeline or a specific agent. Use --pipeline to select: expansao (default) or cwi.
+
+    Por padrao o pipeline retoma automaticamente do ponto onde parou (outputs existentes sao reutilizados).
+    Use --force para reprocessar tudo do zero.
+    """
     if pipeline not in _PIPELINES:
         console.print(f"[red]Pipeline desconhecido: {pipeline}. Opcoes: {', '.join(_PIPELINES)}[/]")
         raise typer.Exit(1)
@@ -36,7 +41,7 @@ def run(
 
     if agent == "all":
         from orchestrator.pipeline import run_pipeline  # noqa: PLC0415
-        run_pipeline(extra_context=context, start_from=start_from or "ceo")
+        run_pipeline(extra_context=context, start_from=start_from or "ceo", force=force)
         return
 
     agent_map = {

@@ -8,15 +8,32 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import asyncio
+
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+from orchestrator.dashboard_api import router as dashboard_router, set_loop
 
 app = FastAPI(
     title="Expansao AI OS",
     description="Multi-agent orchestrator API — Expansao AI + CWI Software",
     version="0.1.0",
 )
+
+app.include_router(dashboard_router)
+
+# Serve static dashboard files
+from pathlib import Path as _Path  # noqa: E402
+if _Path("static").exists():
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@app.on_event("startup")
+async def _startup():
+    set_loop(asyncio.get_event_loop())
 
 _executor = ThreadPoolExecutor(max_workers=4)
 

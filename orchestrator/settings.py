@@ -69,5 +69,10 @@ class Settings(BaseSettings):
     output_dir: str = "outputs/"
     log_level: str = "INFO"
 
+    # Dashboard auth
+    dashboard_user: str = "marcos"
+    dashboard_password: str = "aios2026"
+    dashboard_secret_key: str = "aios-dashboard-secret-change-me"
+
 
 settings = Settings()  # type: ignore[call-arg]
