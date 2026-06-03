@@ -348,19 +348,22 @@ def get_credit_summary() -> dict:
             cur.execute("SELECT * FROM credit_topups ORDER BY topup_date DESC")
             topups = [dict(r) for r in cur.fetchall()]
 
-            # Total spent since the first top-up date (pipeline runs + agent runs)
+            # Total spent since the first top-up date (pipeline runs)
             cur.execute(
-                "SELECT COALESCE(SUM(cost_usd), 0) FROM pipeline_runs WHERE started_at::date >= %s",
+                "SELECT COALESCE(SUM(cost_usd), 0) AS total FROM pipeline_runs WHERE started_at::date >= %s",
                 (first_date,),
             )
-            pipeline_spent = float(cur.fetchone()[0])
+            pipeline_spent = float(cur.fetchone()["total"])
 
             # Also count from agent_runs table (external projects like Climate)
-            cur.execute(
-                "SELECT COALESCE(SUM(cost_usd), 0) FROM agent_runs WHERE run_at::date >= %s",
-                (first_date,),
-            )
-            agent_spent = float(cur.fetchone()[0])
+            try:
+                cur.execute(
+                    "SELECT COALESCE(SUM(cost_usd), 0) AS total FROM agent_runs WHERE run_at::date >= %s",
+                    (first_date,),
+                )
+                agent_spent = float(cur.fetchone()["total"])
+            except Exception:
+                agent_spent = 0.0
 
         total_spent = pipeline_spent + agent_spent
         estimated = max(0.0, total_topup - total_spent)
