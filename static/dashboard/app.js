@@ -217,6 +217,32 @@ function _kanbanColumn(run) {
   return order[0] || 'ceo';
 }
 
+// ── Run metadata helpers ──────────────────────────────────────────────────────
+function _sprint(run) {
+  if (run.started_at) {
+    const d = new Date(run.started_at);
+    const jan4 = new Date(d.getFullYear(), 0, 4);
+    const week = Math.ceil(((d - jan4) / 86400000 + jan4.getDay() + 1) / 7);
+    return `${d.getFullYear()}-W${String(week).padStart(2,'0')}`;
+  }
+  return run.run_id.slice(-6);
+}
+
+function _title(run) {
+  const ctx = run.extra_context || '';
+  // Remove long CLIMA context — use first sentence
+  const first = ctx.split('—')[0].split(':')[0].trim();
+  return first.length > 2 ? first.slice(0, 45) : run.run_id;
+}
+
+function _storyInfo(run) {
+  const devStage = (run.stages || []).find(s => s.stage_name === 'dev');
+  if (!devStage) return null;
+  const summary = devStage.output_summary || '';
+  const m = summary.match(/(\d+)\s+stori/i);
+  return m ? `${m[1]} US` : null;
+}
+
 function _kbCard(run, col) {
   const cardCls = run.status === 'running' ? 'running'
     : run.status === 'completed' ? 'completed'
@@ -224,27 +250,32 @@ function _kbCard(run, col) {
     : 'failed';
 
   const proj = { expansao: 'Expansão AI', cwi: 'CWI', climate: 'Climate', 'grc-flow': 'GRC Flow' }[run.project] || run.project;
-  const shortId = run.run_id.replace('hist-', '').slice(0, 8);
+  const sprint = _sprint(run);
+  const title  = _title(run);
+  const stories = _storyInfo(run);
   const elapsed = run.started_at ? _elapsed(new Date(run.started_at), run.completed_at ? new Date(run.completed_at) : new Date()) : '';
 
-  // Find blocker info for failed runs
+  // Blocker info for failed runs
   let blocker = '';
-  if (run.status === 'failed' && run.stages) {
-    const failedStage = run.stages.find(s => s.status === 'failed');
+  if (run.status === 'failed') {
+    const failedStage = (run.stages || []).find(s => s.status === 'failed');
     const errMsg = failedStage?.error_msg || run.error_msg || '';
-    if (errMsg) blocker = `<div class="kb-card-blocker">⚠ ${errMsg.slice(0, 60)}${errMsg.length > 60 ? '…' : ''}</div>`;
+    if (errMsg) blocker = `<div class="kb-card-blocker">⚠ ${errMsg.slice(0, 55)}${errMsg.length > 55 ? '…' : ''}</div>`;
     else if (col !== '__done__') blocker = `<div class="kb-card-blocker">⚠ Parou neste estágio</div>`;
   }
 
   const gates = (run.gates || []).filter(g => g.decision === 'pending');
-  const gateAlert = gates.length ? `<div class="kb-card-blocker" style="color:var(--yellow)">🚦 Gate pendente</div>` : '';
+  const gateAlert = gates.length ? `<div class="kb-card-blocker" style="color:var(--yellow)">🚦 Gate aguardando aprovação</div>` : '';
 
   return `
     <div class="kb-card ${cardCls}" onclick="openRun('${run.run_id}')">
-      <div class="kb-card-project">${proj}</div>
-      <div class="kb-card-id">${shortId}</div>
-      <div class="kb-card-cost">${fmt$(run.cost_usd || 0)}</div>
-      <div class="kb-card-time">${elapsed}</div>
+      <div class="kb-card-sprint">${proj} · ${sprint}</div>
+      <div class="kb-card-title">${title}</div>
+      <div class="kb-card-meta">
+        <span class="kb-card-cost">${fmt$(run.cost_usd || 0)}</span>
+        ${stories ? `<span class="kb-card-stories">${stories}</span>` : ''}
+        <span class="kb-card-time">${elapsed}</span>
+      </div>
       <span class="kb-card-status ${cardCls}">${run.status}</span>
       ${blocker}${gateAlert}
     </div>`;
@@ -303,23 +334,33 @@ async function openRun(runId) {
 }
 
 function renderModal(run) {
-  document.getElementById('modal-title').textContent =
-    `${run.project} / ${run.pipeline} — ${run.status}`;
+  const proj = { expansao: 'Expansão AI', cwi: 'CWI', climate: 'Climate', 'grc-flow': 'GRC Flow' }[run.project] || run.project;
+  document.getElementById('modal-title').textContent = `${proj} — ${_sprint(run)}`;
   document.getElementById('modal-run-id').textContent = run.run_id;
 
-  // Kanban
+  // Context description
+  const ctx = run.extra_context || '';
+  const ctxEl = document.getElementById('modal-context');
+  if (ctxEl) ctxEl.textContent = ctx || '—';
+
+  // Stages table
   const stageList = run.pipeline === 'cwi' ? STAGES_CWI : STAGES_EXPANSAO;
-  document.getElementById('modal-kanban').innerHTML = stageList.map(s => {
-    const st = (run.stages || []).find(x => x.stage_name === s);
-    const cls = stageClass(run.stages, s, run.current_stage, run.status);
-    const cost = st ? `<div class="kanban-stage-cost">${fmt$(st.cost_usd || 0)}</div>` : '';
-    const tokens = st ? `<div class="kanban-tokens">${(st.input_tokens||0).toLocaleString()} ↑ ${(st.output_tokens||0).toLocaleString()} ↓</div>` : '';
-    return `
-    <div class="kanban-col">
-      <div class="kanban-col-header ${cls}">${STAGE_LABELS[s] || s}</div>
-      ${cost}${tokens}
-    </div>`;
-  }).join('');
+  document.getElementById('modal-kanban').innerHTML = `
+    <table class="modal-stages-table">
+      <thead><tr><th>Agente</th><th>Status</th><th>Stories / Resumo</th><th>Custo</th><th>Tokens</th></tr></thead>
+      <tbody>
+        ${stageList.map(s => {
+          const st = (run.stages || []).find(x => x.stage_name === s);
+          const cls = stageClass(run.stages, s, run.current_stage, run.status);
+          const statusBadge = st ? `<span class="badge badge-${st.status === 'completed' ? 'completed' : st.status === 'running' ? 'running' : st.status === 'failed' ? 'failed' : 'paused'}">${st.status}</span>` : '<span style="color:var(--muted)">—</span>';
+          const summary = st?.output_summary || '—';
+          const cost = st ? fmt$(st.cost_usd || 0) : '—';
+          const tokens = st ? `${(st.input_tokens||0).toLocaleString()}↑ ${(st.output_tokens||0).toLocaleString()}↓` : '—';
+          const rowCls = cls === 'failed' ? 'style="background:rgba(248,81,73,.04)"' : cls === 'running' ? 'style="background:rgba(88,166,255,.04)"' : '';
+          return `<tr ${rowCls}><td><strong>${STAGE_LABELS[s]||s}</strong></td><td>${statusBadge}</td><td style="max-width:240px;font-size:.8rem;color:var(--muted)">${summary}</td><td style="font-family:monospace;font-size:.8rem;color:var(--orange)">${cost}</td><td style="font-family:monospace;font-size:.75rem;color:var(--muted)">${tokens}</td></tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
 
   // Gates
   const pendingGates = (run.gates || []).filter(g => g.decision === 'pending');
@@ -338,12 +379,11 @@ function renderModal(run) {
     gatesSection.classList.add('hidden');
   }
 
-  // Costs
+  // Footer
   document.getElementById('modal-cost').textContent = fmt$(run.cost_usd || 0);
   const started = run.started_at ? new Date(run.started_at) : null;
   const ended   = run.completed_at ? new Date(run.completed_at) : new Date();
-  document.getElementById('modal-duration').textContent =
-    started ? formatDuration(ended - started) : '—';
+  document.getElementById('modal-duration').textContent = started ? formatDuration(ended - started) : '—';
 }
 
 function formatDuration(ms) {

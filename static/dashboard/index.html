@@ -134,8 +134,14 @@
       <button class="btn-ghost" onclick="closeModal()">✕</button>
     </div>
 
-    <!-- Pipeline kanban -->
-    <div class="kanban" id="modal-kanban"></div>
+    <!-- Context description -->
+    <div class="modal-context-wrap">
+      <span class="modal-context-label">Contexto:</span>
+      <span id="modal-context" class="modal-context-text"></span>
+    </div>
+
+    <!-- Stages table -->
+    <div id="modal-kanban" style="padding:0 24px 16px;overflow-x:auto"></div>
 
     <!-- Gates -->
     <div id="modal-gates" class="gates-section hidden">
