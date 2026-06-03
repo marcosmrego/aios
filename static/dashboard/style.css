@@ -175,6 +175,35 @@ main { max-width: 1100px; margin: 0 auto; padding: 24px; display: flex; flex-dir
 .modal-context-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-right: 8px; }
 .modal-context-text { font-size: .85rem; color: var(--text); }
 
+/* Story tooltip */
+.story-tooltip {
+  position: fixed;
+  z-index: 999;
+  background: #1c2128;
+  border: 1px solid var(--blue);
+  border-radius: 10px;
+  padding: 14px 16px;
+  width: 300px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .15s ease;
+  font-size: .82rem;
+  line-height: 1.5;
+}
+.story-tooltip.visible { opacity: 1; }
+.story-tooltip-id { font-family: monospace; color: var(--blue); font-size: .75rem; margin-bottom: 4px; }
+.story-tooltip-title { font-weight: 700; color: var(--text); margin-bottom: 10px; line-height: 1.3; }
+.story-tooltip-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #21262d; }
+.story-tooltip-row:last-child { border-bottom: none; }
+.story-tooltip-label { color: var(--muted); }
+.story-tooltip-value { color: var(--text); text-align: right; max-width: 160px; }
+.story-tooltip-status-dev       { color: var(--blue); }
+.story-tooltip-status-qa_approved { color: var(--green); }
+.story-tooltip-status-qa_rejected { color: var(--red); }
+.story-tooltip-status-backlog   { color: var(--muted); }
+.story-tooltip-notes { margin-top: 8px; padding-top: 8px; border-top: 1px solid #21262d; color: var(--yellow); font-size: .75rem; line-height: 1.4; }
+
 /* Kb card updated fields */
 .kb-card-sprint { font-size: .65rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 3px; }
 .kb-card-title { font-size: .8rem; font-weight: 600; color: var(--text); margin-bottom: 6px; line-height: 1.3; }
