@@ -55,8 +55,13 @@ Inclua o JSON de output ao final da sua resposta.
             # Input from CEO Agent (standard flow)
             ceo_output = ceo_output or {}
             sprint = ceo_output.get("week", "?")
-            priorities_json = json.dumps(ceo_output.get("priorities", []), ensure_ascii=False, indent=2)
+            priorities = ceo_output.get("priorities", [])
             pm_instructions = ceo_output.get("pm_instructions", "")
+
+            # Fetch existing User Stories from Notion PRDs for each priority
+            notion_stories = self._fetch_notion_stories(priorities)
+
+            priorities_json = json.dumps(priorities, ensure_ascii=False, indent=2)
             user_message = f"""
 ## Output do CEO Agent
 **Sprint**: {sprint}
@@ -66,13 +71,19 @@ Inclua o JSON de output ao final da sua resposta.
 {priorities_json}
 ```
 
+### User Stories já definidas no Notion (USE ESTAS — não invente outras)
+```json
+{json.dumps(notion_stories, ensure_ascii=False, indent=2)}
+```
+
 ### Instruções do CEO
 {pm_instructions}
 
-Por favor, escreva os PRDs e User Stories para cada prioridade acima.
+IMPORTANTE: Use as User Stories do Notion como base. Enriqueça com critérios de aceite e estimativas, mas não altere IDs nem títulos, e não crie stories que não estejam no Notion.
 Inclua o JSON de output ao final da sua resposta.
 """
         response_text = self._run(user_message, max_tokens=32768)
+
         console.print("\n[dim]--- PM Agent output preview ---[/]")
         console.print(response_text[:800] + ("..." if len(response_text) > 800 else ""))
 
@@ -103,3 +114,34 @@ Inclua o JSON de output ao final da sua resposta.
             console.print("[green]PRDs aprovados. Acionando Architect Agent...[/]")
 
         return output
+
+    def _fetch_notion_stories(self, priorities: list) -> dict:
+        """Fetch existing User Stories from Notion PRD pages for each priority."""
+        result = {}
+        for p in priorities:
+            notion_id = p.get("notion_id", "")
+            title = p.get("title", "")
+            if not notion_id:
+                continue
+            try:
+                page = self.notion._get(f"/pages/{notion_id}")
+                blocks = self.notion._get(f"/blocks/{notion_id}/children").get("results", [])
+                stories_text = []
+                in_stories = False
+                for block in blocks:
+                    btype = block.get("type", "")
+                    text = ""
+                    if btype in ("paragraph", "bulleted_list_item", "numbered_list_item"):
+                        rich = block.get(btype, {}).get("rich_text", [])
+                        text = "".join(t.get("plain_text", "") for t in rich)
+                    elif btype == "heading_2":
+                        rich = block.get("heading_2", {}).get("rich_text", [])
+                        heading = "".join(t.get("plain_text", "") for t in rich)
+                        in_stories = "User Stor" in heading or "Historia" in heading
+                    if in_stories and text.strip():
+                        stories_text.append(text.strip())
+                if stories_text:
+                    result[title] = stories_text
+            except Exception:
+                pass  # If fetch fails, PM generates from scratch
+        return result

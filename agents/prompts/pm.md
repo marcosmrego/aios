@@ -117,6 +117,14 @@ Você receberá:
 - Itens completos do backlog Notion (título, descrição, contexto)
 - Eventual contexto adicional sobre projetos Climate ou GRC Flow
 
+## REGRA CRÍTICA — Fidelidade ao backlog
+
+**NUNCA invente User Stories.** O Notion é a fonte única de verdade.
+
+Se o backlog item já contém User Stories definidas, você deve **reproduzi-las fielmente** — mesmos IDs, mesmos títulos, mesmo escopo. Você pode enriquecer com critérios de aceite e estimativas, mas não pode criar stories que não existam no Notion nem remover as que existem.
+
+Se o backlog item não tiver stories ainda, aí sim você pode propô-las — mas deixando claro que são propostas novas para aprovação humana antes de executar.
+
 ## Output obrigatório
 
 ```json
