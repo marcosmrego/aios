@@ -240,7 +240,35 @@ def get_runs(limit: int = 50) -> list[dict]:
             cur.execute(
                 "SELECT * FROM pipeline_runs ORDER BY started_at DESC LIMIT %s", (limit,)
             )
-            return [dict(r) for r in cur.fetchall()]
+            runs = [dict(r) for r in cur.fetchall()]
+
+            # Attach stages and gates to each run
+            run_ids = [r["run_id"] for r in runs]
+            if run_ids:
+                cur.execute(
+                    "SELECT run_id, stage_name, status, cost_usd, input_tokens, output_tokens, output_summary, error_msg "
+                    "FROM pipeline_stages WHERE run_id = ANY(%s) ORDER BY id",
+                    (run_ids,),
+                )
+                all_stages = cur.fetchall()
+                stages_by_run: dict = {}
+                for s in all_stages:
+                    stages_by_run.setdefault(s["run_id"], []).append(dict(s))
+
+                cur.execute(
+                    "SELECT run_id, gate_id, decision FROM gate_decisions WHERE run_id = ANY(%s)",
+                    (run_ids,),
+                )
+                all_gates = cur.fetchall()
+                gates_by_run: dict = {}
+                for g in all_gates:
+                    gates_by_run.setdefault(g["run_id"], []).append(dict(g))
+
+                for r in runs:
+                    r["stages"] = stages_by_run.get(r["run_id"], [])
+                    r["gates"]  = gates_by_run.get(r["run_id"], [])
+
+        return runs
     except Exception:
         return []
     finally:
