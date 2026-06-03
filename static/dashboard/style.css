@@ -28,7 +28,7 @@ header { display: flex; align-items: center; justify-content: space-between; pad
 /* Main */
 main { max-width: 1100px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 28px; }
 
-/* Cost bar */
+/* Cost bar (legado — mantido para compatibilidade) */
 .cost-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .cost-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; }
 .cost-card.accent { border-color: var(--blue); }
@@ -103,9 +103,15 @@ main { max-width: 1100px; margin: 0 auto; padding: 24px; display: flex; flex-dir
 .badge-failed   { background: rgba(248,81,73,.15);  color: var(--red); }
 .badge-paused   { background: rgba(210,153,34,.15); color: var(--yellow); }
 
+/* Cost bar global (sempre visível no topo) */
+.cost-bar-global { display: flex; gap: 0; background: var(--surface); border-bottom: 1px solid var(--border); padding: 0; }
+.cost-bar-global .cost-card { border: none; border-right: 1px solid var(--border); border-radius: 0; flex: 1; padding: 12px 20px; }
+.cost-bar-global .cost-card:last-child { border-right: none; }
+.cost-bar-global .cost-value { font-size: 1.2rem; }
+
 /* Tabs */
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); padding-bottom: 0; }
-.tab { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); padding: 8px 18px; font-size: .9rem; cursor: pointer; margin-bottom: -1px; transition: all .2s; }
+.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--surface); padding: 0 24px; }
+.tab { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); padding: 12px 20px; font-size: .88rem; cursor: pointer; margin-bottom: -1px; transition: all .2s; }
 .tab:hover { color: var(--text); }
 .tab.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 600; }
 .hidden { display: none !important; }

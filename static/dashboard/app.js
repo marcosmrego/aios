@@ -27,7 +27,8 @@ async function apiFetch(path, opts = {}) {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
-  await Promise.all([loadCosts(), loadRuns(), loadCredits()]);
+  await Promise.all([loadCosts(), loadRuns()]);
+  loadStories();   // primeira aba — carrega em paralelo
   connectSSE();
 }
 
@@ -422,12 +423,17 @@ function connectSSE() {
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
+const TABS = ['stories', 'runs', 'history', 'credits'];
+
 function switchTab(tab) {
-  document.getElementById('panel-runs').classList.toggle('hidden', tab !== 'runs');
-  document.getElementById('panel-stories').classList.toggle('hidden', tab !== 'stories');
-  document.getElementById('tab-runs').classList.toggle('active', tab === 'runs');
-  document.getElementById('tab-stories').classList.toggle('active', tab === 'stories');
+  TABS.forEach(t => {
+    document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
+    document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+  });
   if (tab === 'stories') loadStories();
+  if (tab === 'credits') loadCredits();
+  if (tab === 'history') renderRuns();
+  if (tab === 'runs')    renderKanban();
 }
 
 // ── Stories kanban ────────────────────────────────────────────────────────────

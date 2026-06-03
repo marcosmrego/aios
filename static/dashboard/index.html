@@ -19,9 +19,8 @@
   </div>
 </header>
 
-<!-- Cost cards -->
-<main>
-<section class="cost-bar">
+<!-- Cost bar (sempre visível) -->
+<div class="cost-bar-global">
   <div class="cost-card">
     <div class="cost-label">Hoje</div>
     <div class="cost-value" id="cost-today">—</div>
@@ -38,16 +37,68 @@
     <div class="cost-label">Total acumulado</div>
     <div class="cost-value" id="cost-total">—</div>
   </div>
-</section>
+</div>
 
-<!-- Anthropic credits -->
-<section>
-  <div class="section-header">
-    <h2>⚡ Saldo Anthropic</h2>
+<main>
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab active" id="tab-stories"  onclick="switchTab('stories')">📋 User Stories</button>
+  <button class="tab"        id="tab-runs"      onclick="switchTab('runs')">⚙ Execuções</button>
+  <button class="tab"        id="tab-history"   onclick="switchTab('history')">🕐 Histórico</button>
+  <button class="tab"        id="tab-credits"   onclick="switchTab('credits')">💳 Saldo</button>
+</div>
+
+<!-- ── Aba 1: User Stories ───────────────────────────────────────── -->
+<div id="panel-stories">
+  <div class="section-header" style="margin-top:14px">
+    <span style="color:var(--muted);font-size:.85rem">Cada card = uma User Story</span>
+    <select id="story-sprint-filter" onchange="loadStories()">
+      <option value="">Carregando...</option>
+    </select>
+  </div>
+  <div class="kanban-board" id="stories-board"></div>
+</div>
+
+<!-- ── Aba 2: Execuções (kanban de runs) ────────────────────────── -->
+<div id="panel-runs" class="hidden">
+  <div class="section-header" style="margin-top:14px">
+    <span style="color:var(--muted);font-size:.85rem">Cada card = uma execução do pipeline</span>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span class="dot-live"></span>
+      <select id="kanban-filter" onchange="renderKanban()">
+        <option value="">Todos os projetos</option>
+        <option value="expansao">Expansão AI</option>
+        <option value="cwi">CWI Software</option>
+      </select>
+    </div>
+  </div>
+  <div class="kanban-board" id="kanban-board"></div>
+</div>
+
+<!-- ── Aba 3: Histórico ──────────────────────────────────────────── -->
+<div id="panel-history" class="hidden">
+  <div class="section-header" style="margin-top:14px">
+    <h2 style="font-size:.9rem">Histórico de execuções</h2>
+    <select id="filter-project" onchange="renderRuns()">
+      <option value="">Todos os projetos</option>
+      <option value="expansao">Expansão AI</option>
+      <option value="cwi">CWI Software</option>
+      <option value="climate">Climate</option>
+      <option value="grc-flow">GRC Flow</option>
+    </select>
+  </div>
+  <div id="runs-list" class="runs-list">
+    <p class="empty-state">Carregando...</p>
+  </div>
+</div>
+
+<!-- ── Aba 4: Saldo ──────────────────────────────────────────────── -->
+<div id="panel-credits" class="hidden">
+  <div class="section-header" style="margin-top:14px">
+    <h2 style="font-size:.9rem">⚡ Saldo Anthropic</h2>
     <button class="btn-ghost" onclick="toggleTopupForm()">+ Registrar recarga</button>
   </div>
 
-  <!-- Summary card -->
   <div class="credits-card" id="credits-card">
     <div class="credits-left">
       <div class="credits-values">
@@ -62,7 +113,6 @@
     <div class="credits-stats" id="credits-stats"></div>
   </div>
 
-  <!-- Add topup form (hidden by default) -->
   <div class="topup-form hidden" id="topup-form">
     <h4>Nova recarga</h4>
     <div class="topup-fields">
@@ -85,63 +135,8 @@
     </div>
   </div>
 
-  <!-- Topup history -->
   <div id="topup-history"></div>
-</section>
-
-<!-- Tabs: Execuções / Stories -->
-<section>
-  <div class="tabs">
-    <button class="tab active" id="tab-runs" onclick="switchTab('runs')">⚙ Execuções (Runs)</button>
-    <button class="tab" id="tab-stories" onclick="switchTab('stories')">📋 User Stories</button>
-  </div>
-
-  <!-- Kanban de execuções -->
-  <div id="panel-runs">
-    <div class="section-header" style="margin-top:12px">
-      <span style="color:var(--muted);font-size:.85rem">Cada card = uma execução do pipeline</span>
-      <div style="display:flex;gap:10px;align-items:center">
-        <span class="dot-live"></span>
-        <select id="kanban-filter" onchange="renderKanban()">
-          <option value="">Todos os projetos</option>
-          <option value="expansao">Expansão AI</option>
-          <option value="cwi">CWI Software</option>
-        </select>
-      </div>
-    </div>
-    <div class="kanban-board" id="kanban-board"></div>
-  </div>
-
-  <!-- Kanban de stories -->
-  <div id="panel-stories" class="hidden">
-    <div class="section-header" style="margin-top:12px">
-      <span style="color:var(--muted);font-size:.85rem">Cada card = uma User Story</span>
-      <div style="display:flex;gap:10px">
-        <select id="story-sprint-filter" onchange="loadStories()">
-          <option value="">Sprint atual</option>
-        </select>
-      </div>
-    </div>
-    <div class="kanban-board" id="stories-board"></div>
-  </div>
-</section>
-
-<!-- Runs list -->
-<section>
-  <div class="section-header">
-    <h2>Histórico de execuções</h2>
-    <select id="filter-project" onchange="renderRuns()">
-      <option value="">Todos os projetos</option>
-      <option value="expansao">Expansão AI</option>
-      <option value="cwi">CWI Software</option>
-      <option value="climate">Climate</option>
-      <option value="grc-flow">GRC Flow</option>
-    </select>
-  </div>
-  <div id="runs-list" class="runs-list">
-    <p class="empty-state">Carregando...</p>
-  </div>
-</section>
+</div>
 </main>
 
 <!-- Run detail modal -->
@@ -154,23 +149,15 @@
       </div>
       <button class="btn-ghost" onclick="closeModal()">✕</button>
     </div>
-
-    <!-- Context description -->
     <div class="modal-context-wrap">
       <span class="modal-context-label">Contexto:</span>
       <span id="modal-context" class="modal-context-text"></span>
     </div>
-
-    <!-- Stages table -->
     <div id="modal-kanban" style="padding:0 24px 16px;overflow-x:auto"></div>
-
-    <!-- Gates -->
     <div id="modal-gates" class="gates-section hidden">
       <h4>Gates pendentes</h4>
       <div id="gates-list"></div>
     </div>
-
-    <!-- Cost breakdown -->
     <div class="modal-costs">
       <span>Custo total: <strong id="modal-cost">—</strong></span>
       <span>Duração: <strong id="modal-duration">—</strong></span>
