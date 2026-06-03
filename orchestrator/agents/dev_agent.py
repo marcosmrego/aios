@@ -99,6 +99,16 @@ class DevAgent(BaseAgent):
 
             self._write_code_files(sprint_dir, impl)
 
+            # Update dashboard pipeline_stories
+            n_files = len(impl.get("files_created", []))
+            if n_files > 0:
+                try:
+                    from tools.run_tracker import upsert_story  # noqa: PLC0415
+                    upsert_story(sprint=sprint, story_id=story_id,
+                                 title=story.get("title", ""), status="dev", dev_files=n_files)
+                except Exception:
+                    pass
+
             # Save incrementally after each story so a crash doesn't lose progress
             self._save_output(
                 {"sprint": sprint, "implementations": new_implementations,

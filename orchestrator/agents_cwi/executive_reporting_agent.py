@@ -42,7 +42,10 @@ class ExecutiveReportingAgent(BaseAgent):
         pmo_text = json.dumps(pmo_output, ensure_ascii=False, indent=2) if pmo_output else self._load_latest_json("cwi/pmo_")
         agile_text = json.dumps(agile_output, ensure_ascii=False, indent=2) if agile_output else self._load_latest_json("cwi/agile_coach_")
 
-        # 2. Run Claude
+        # 2. Pull dashboard data (pipeline reality vs planned)
+        dashboard_text = self._load_dashboard_data()
+
+        # 3. Run Claude
         user_message = f"""Gere o relatorio executivo para a diretoria com base nos dados abaixo.
 
 PMO STATUS REPORT:
@@ -51,9 +54,14 @@ PMO STATUS REPORT:
 AGILE COACH REPORT:
 {agile_text or "(sem dados de Agile Coach)"}
 
+DADOS DO PIPELINE AIOS (fonte de verdade — o que foi realmente executado):
+{dashboard_text}
+
 CONTEXTO ADICIONAL:
 {extra_context or "(nenhum)"}
 
+Use os dados do pipeline AIOS para conciliar o que foi planejado vs o que foi realmente entregue.
+Destaque discrepâncias entre o planejado (Notion) e o executado (pipeline).
 Retorne apenas o JSON, sem texto adicional."""
 
         response_text = self._run(user_message, max_tokens=8192)
@@ -84,6 +92,39 @@ Retorne apenas o JSON, sem texto adicional."""
 
         console.print("[green]Executive Reporting Agent concluido.[/]")
         return output
+
+    def _load_dashboard_data(self) -> str:
+        """Pull story status, costs and recent runs from the dashboard DB."""
+        try:
+            from tools.run_tracker import get_stories, get_cost_summary, get_runs  # noqa: PLC0415
+            from datetime import date  # noqa: PLC0415
+
+            sprint = date.today().strftime("%Y-W%V")
+            stories = get_stories(sprint=sprint)
+            costs = get_cost_summary()
+            runs = get_runs(limit=10)
+
+            # Summarise by project/epic
+            by_epic: dict = {}
+            for s in stories:
+                key = f"{s['project']} / {s.get('epic_id', '?')}"
+                by_epic.setdefault(key, {"total": 0, "dev": 0, "qa_approved": 0, "qa_rejected": 0, "backlog": 0})
+                by_epic[key]["total"] += 1
+                by_epic[key][s.get("status", "backlog")] = by_epic[key].get(s.get("status", "backlog"), 0) + 1
+
+            summary = {
+                "sprint": sprint,
+                "stories_por_epico": by_epic,
+                "custos": costs.get("totals", {}),
+                "ultimas_execucoes": [
+                    {"run_id": r["run_id"], "status": r["status"],
+                     "cost": float(r.get("cost_usd", 0)), "project": r["project"]}
+                    for r in runs[:5]
+                ],
+            }
+            return json.dumps(summary, ensure_ascii=False, indent=2, default=str)
+        except Exception as e:
+            return f"(dashboard indisponível: {e})"
 
     @staticmethod
     def _load_latest_json(prefix: str) -> str:

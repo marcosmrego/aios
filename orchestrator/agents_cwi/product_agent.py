@@ -42,15 +42,25 @@ class ProductAgent(BaseAgent):
             console.print("[red]Nenhuma demanda encontrada. Coloque em inputs/cwi/demandas_*.txt[/]")
             raise SystemExit(1)
 
-        # 2. Run Claude
+        # 2. Load existing backlog to avoid duplicates
+        existing_backlog = self._load_existing_backlog()
+
+        # 3. Run Claude
         user_message = f"""Analise as demandas abaixo e gere epicos, historias e criterios de aceite.
 
 DEMANDAS:
 {demands_text}
 
+BACKLOG EXISTENTE NO NOTION (nao crie epicos/historias que ja existam aqui — apenas complemente):
+{existing_backlog}
+
+REGRA: Se a demanda se refere a algo ja existente no backlog, enriqueça a historia existente.
+Apenas crie itens novos para demandas genuinamente novas.
+
 Retorne apenas o JSON, sem texto adicional."""
 
         response_text = self._run(user_message, max_tokens=8192)
+
 
         # 3. Parse output
         output = self._parse_json_output(response_text)
@@ -79,6 +89,22 @@ Retorne apenas o JSON, sem texto adicional."""
 
         console.print("[green]Product Agent concluido.[/]")
         return output
+
+    def _load_existing_backlog(self) -> str:
+        """Load existing CWI backlog from Notion to avoid creating duplicates."""
+        try:
+            from tools.notion import NotionClient  # noqa: PLC0415
+            import json as _json  # noqa: PLC0415
+            items = NotionClient().get_backlog(project="CWI")
+            if not items:
+                items = NotionClient().get_backlog()  # fallback sem filtro
+            return _json.dumps(
+                [{"id": i["notion_id"], "title": i["title"], "status": i["status"]}
+                 for i in items[:50]],
+                ensure_ascii=False, indent=2
+            )
+        except Exception:
+            return "(backlog não disponível)"
 
     @staticmethod
     def _load_latest_input(prefix: str) -> str:

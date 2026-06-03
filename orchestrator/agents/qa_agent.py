@@ -58,9 +58,22 @@ class QAAgent(BaseAgent):
             impl = impls_by_id.get(sid, {"story_id": sid, "files_created": []})
             report = self._evaluate_story(story, impl, contracts_json, sprint)
             reports.append(report)
-            if report.get("recommendation") in ("block_deploy", "fix_required"):
+            rec = report.get("recommendation", "")
+            is_critical = rec in ("block_deploy", "fix_required")
+            if is_critical:
                 critical_count += 1
-            console.print(f"[dim]  {sid}: {report.get('recommendation', '?')}[/]")
+            console.print(f"[dim]  {sid}: {rec}[/]")
+
+            # Update dashboard pipeline_stories
+            try:
+                from tools.run_tracker import upsert_story  # noqa: PLC0415
+                qa_status = "qa_approved" if not is_critical else "qa_rejected"
+                issues = report.get("code_quality", {}).get("issues", [])
+                notes = "; ".join(i.get("description", "") for i in issues[:2] if i.get("severity") == "critical")
+                upsert_story(sprint=sprint, story_id=sid,
+                             status=qa_status, qa_result=rec, qa_notes=notes)
+            except Exception:
+                pass
 
         approved = critical_count == 0
         output = {

@@ -61,7 +61,10 @@ class PMOAgent(BaseAgent):
         iso_week = today.strftime("%Y-W%V")
         console.print(f"[dim]Periodo: {iso_week} | Reunioes encontradas: {meeting_text.count('=== REUNIAO')}[/]")
 
-        # 4. Run Claude
+        # 4. Pull dashboard data
+        dashboard_text = self._load_dashboard_data(iso_week)
+
+        # 5. Run Claude
         user_message = f"""Gere o status report PMO semanal com base nas informacoes abaixo.
 
 PERIODO: {iso_week}
@@ -72,18 +75,22 @@ ATAS DAS REUNIOES DA SEMANA:
 INDICADORES DO PERIODO:
 {indicators_text or "(sem indicadores disponiveis)"}
 
+STATUS DO PIPELINE DE DESENVOLVIMENTO (dados reais de execucao):
+{dashboard_text}
+
 CONTEXTO ADICIONAL:
 {extra_context or "(nenhum)"}
 
+Use os dados do pipeline para incluir no report o status real de cada story (planejado vs entregue).
 Retorne apenas o JSON, sem texto adicional."""
 
         response_text = self._run(user_message, max_tokens=8192)
 
-        # 5. Parse output
+        # 6. Parse output
         output = self._parse_json_output(response_text)
         output.setdefault("periodo", iso_week)
 
-        # 6. Save locally
+        # 7. Save locally
         self._save_output(output, f"cwi/pmo_{today.strftime('%Y_%m_%d')}.json")
 
         # 7. Save to Notion CWI Reports
@@ -126,6 +133,32 @@ Retorne apenas o JSON, sem texto adicional."""
         if latest:
             console.print("[dim]Usando ultimo arquivo local de reuniao[/]")
         return latest
+
+    @staticmethod
+    def _load_dashboard_data(sprint: str) -> str:
+        """Pull story + cost status from dashboard DB for this sprint."""
+        try:
+            from tools.run_tracker import get_stories, get_cost_summary  # noqa: PLC0415
+            import json as _json  # noqa: PLC0415
+
+            stories = get_stories(sprint=sprint)
+            costs = get_cost_summary()
+
+            by_project: dict = {}
+            for s in stories:
+                proj = s.get("project", "?")
+                ep = s.get("epic_id", "?")
+                by_project.setdefault(proj, {}).setdefault(ep, []).append({
+                    "id": s["story_id"], "title": s["title"], "status": s["status"]
+                })
+
+            return _json.dumps({
+                "sprint": sprint,
+                "stories_por_projeto": by_project,
+                "custos": costs.get("totals", {}),
+            }, ensure_ascii=False, indent=2, default=str)
+        except Exception as e:
+            return f"(dashboard indisponível: {e})"
 
     @staticmethod
     def _load_latest_input(prefix: str) -> str:
