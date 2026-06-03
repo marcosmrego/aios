@@ -7,6 +7,23 @@ from datetime import datetime, timezone
 from typing import Any
 
 
+_CREATE_STORIES_SQL = """
+CREATE TABLE IF NOT EXISTS pipeline_stories (
+    id          SERIAL PRIMARY KEY,
+    sprint      VARCHAR(20)  NOT NULL,
+    story_id    VARCHAR(20)  NOT NULL,
+    title       TEXT         DEFAULT '',
+    project     VARCHAR(50)  DEFAULT 'expansao',
+    prd_title   TEXT         DEFAULT '',
+    status      VARCHAR(20)  NOT NULL DEFAULT 'backlog',
+    dev_files   INTEGER      DEFAULT 0,
+    qa_result   VARCHAR(20)  DEFAULT '',
+    qa_notes    TEXT         DEFAULT '',
+    updated_at  TIMESTAMPTZ  DEFAULT NOW(),
+    UNIQUE(sprint, story_id)
+);
+"""
+
 _CREATE_CREDITS_SQL = """
 CREATE TABLE IF NOT EXISTS credit_topups (
     id          SERIAL PRIMARY KEY,
@@ -67,6 +84,7 @@ def _conn():
     with c.cursor() as cur:
         cur.execute(_CREATE_SQL)
         cur.execute(_CREATE_CREDITS_SQL)
+        cur.execute(_CREATE_STORIES_SQL)
     c.commit()
     return c
 
@@ -298,6 +316,49 @@ def get_run_detail(run_id: str) -> dict | None:
         return run
     except Exception:
         return None
+    finally:
+        c.close()
+
+
+def upsert_story(sprint: str, story_id: str, title: str = "", project: str = "expansao",
+                 prd_title: str = "", status: str = "backlog", dev_files: int = 0,
+                 qa_result: str = "", qa_notes: str = "") -> None:
+    c = _conn()
+    if not c:
+        return
+    try:
+        with c.cursor() as cur:
+            cur.execute("""
+                INSERT INTO pipeline_stories
+                    (sprint, story_id, title, project, prd_title, status, dev_files, qa_result, qa_notes, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                ON CONFLICT (sprint, story_id) DO UPDATE SET
+                    title=EXCLUDED.title, prd_title=EXCLUDED.prd_title,
+                    status=EXCLUDED.status, dev_files=EXCLUDED.dev_files,
+                    qa_result=EXCLUDED.qa_result, qa_notes=EXCLUDED.qa_notes,
+                    updated_at=NOW()
+            """, (sprint, story_id, title, project, prd_title, status, dev_files, qa_result, qa_notes))
+        c.commit()
+    except Exception:
+        c.rollback()
+    finally:
+        c.close()
+
+
+def get_stories(sprint: str | None = None) -> list[dict]:
+    c = _conn()
+    if not c:
+        return []
+    try:
+        import psycopg2.extras  # noqa: PLC0415
+        with c.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            if sprint:
+                cur.execute("SELECT * FROM pipeline_stories WHERE sprint=%s ORDER BY story_id", (sprint,))
+            else:
+                cur.execute("SELECT * FROM pipeline_stories ORDER BY sprint DESC, story_id")
+            return [dict(r) for r in cur.fetchall()]
+    except Exception:
+        return []
     finally:
         c.close()
 

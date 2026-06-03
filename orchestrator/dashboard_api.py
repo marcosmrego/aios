@@ -133,6 +133,28 @@ def get_costs(user: str = Depends(_auth)) -> dict:
     return {"runs": runs_summary, "agents": agent_summary}
 
 
+@router.get("/stories")
+def list_stories(sprint: str | None = None, user: str = Depends(_auth)) -> list[dict]:
+    from tools.run_tracker import get_stories  # noqa: PLC0415
+    return _serialize(get_stories(sprint=sprint))
+
+
+@router.get("/stories/sprints")
+def list_sprints(user: str = Depends(_auth)) -> list[str]:
+    from tools.run_tracker import _conn  # noqa: PLC0415
+    c = _conn()
+    if not c:
+        return []
+    try:
+        with c.cursor() as cur:
+            cur.execute("SELECT DISTINCT sprint FROM pipeline_stories ORDER BY sprint DESC")
+            return [r[0] for r in cur.fetchall()]
+    except Exception:
+        return []
+    finally:
+        c.close()
+
+
 @router.get("/credits")
 def get_credits(user: str = Depends(_auth)) -> dict:
     from tools.run_tracker import get_credit_summary  # noqa: PLC0415

@@ -89,20 +89,41 @@
   <div id="topup-history"></div>
 </section>
 
-<!-- Kanban pipeline -->
+<!-- Tabs: Execuções / Stories -->
 <section>
-  <div class="section-header">
-    <h2>Pipeline — visão de estágios</h2>
-    <div style="display:flex;gap:10px;align-items:center">
-      <span class="dot-live"></span>
-      <select id="kanban-filter" onchange="renderKanban()">
-        <option value="">Todos os projetos</option>
-        <option value="expansao">Expansão AI</option>
-        <option value="cwi">CWI Software</option>
-      </select>
-    </div>
+  <div class="tabs">
+    <button class="tab active" id="tab-runs" onclick="switchTab('runs')">⚙ Execuções (Runs)</button>
+    <button class="tab" id="tab-stories" onclick="switchTab('stories')">📋 User Stories</button>
   </div>
-  <div class="kanban-board" id="kanban-board"></div>
+
+  <!-- Kanban de execuções -->
+  <div id="panel-runs">
+    <div class="section-header" style="margin-top:12px">
+      <span style="color:var(--muted);font-size:.85rem">Cada card = uma execução do pipeline</span>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span class="dot-live"></span>
+        <select id="kanban-filter" onchange="renderKanban()">
+          <option value="">Todos os projetos</option>
+          <option value="expansao">Expansão AI</option>
+          <option value="cwi">CWI Software</option>
+        </select>
+      </div>
+    </div>
+    <div class="kanban-board" id="kanban-board"></div>
+  </div>
+
+  <!-- Kanban de stories -->
+  <div id="panel-stories" class="hidden">
+    <div class="section-header" style="margin-top:12px">
+      <span style="color:var(--muted);font-size:.85rem">Cada card = uma User Story</span>
+      <div style="display:flex;gap:10px">
+        <select id="story-sprint-filter" onchange="loadStories()">
+          <option value="">Sprint atual</option>
+        </select>
+      </div>
+    </div>
+    <div class="kanban-board" id="stories-board"></div>
+  </div>
 </section>
 
 <!-- Runs list -->

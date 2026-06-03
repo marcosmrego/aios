@@ -421,5 +421,85 @@ function connectSSE() {
   es.onerror = () => setTimeout(connectSSE, 5000);
 }
 
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('panel-runs').classList.toggle('hidden', tab !== 'runs');
+  document.getElementById('panel-stories').classList.toggle('hidden', tab !== 'stories');
+  document.getElementById('tab-runs').classList.toggle('active', tab === 'runs');
+  document.getElementById('tab-stories').classList.toggle('active', tab === 'stories');
+  if (tab === 'stories') loadStories();
+}
+
+// ── Stories kanban ────────────────────────────────────────────────────────────
+const STORY_COLS = [
+  { key: 'backlog',     label: '📋 Backlog',      cls: '' },
+  { key: 'dev',         label: '💻 Dev',           cls: '' },
+  { key: 'qa',          label: '🔍 QA',            cls: '' },
+  { key: 'qa_approved', label: '✅ QA Aprovado',   cls: 'done-col' },
+  { key: 'qa_rejected', label: '❌ QA Reprovado',  cls: 'has-failed' },
+  { key: 'deployed',    label: '🚀 Deploy',        cls: '' },
+  { key: 'done',        label: '🏁 Concluído',     cls: 'done-col' },
+];
+
+async function loadStories() {
+  // Load sprints into selector
+  const sprints = await apiFetch('/dashboard/stories/sprints');
+  const sel = document.getElementById('story-sprint-filter');
+  if (sprints && sprints.length) {
+    sel.innerHTML = sprints.map(s => `<option value="${s}">${s}</option>`).join('');
+  }
+
+  const sprint = sel.value;
+  const url = sprint ? `/dashboard/stories?sprint=${sprint}` : '/dashboard/stories';
+  const stories = await apiFetch(url);
+  if (!stories) return;
+  renderStoriesKanban(stories);
+}
+
+function renderStoriesKanban(stories) {
+  const board = document.getElementById('stories-board');
+  const byStatus = {};
+  STORY_COLS.forEach(c => byStatus[c.key] = []);
+  stories.forEach(s => {
+    const col = byStatus[s.status] ? s.status : 'backlog';
+    byStatus[col].push(s);
+  });
+
+  board.innerHTML = STORY_COLS.map(col => {
+    const cards = byStatus[col.key] || [];
+    return `
+      <div class="kb-col ${col.cls}">
+        <div class="kb-col-head">
+          <div class="kb-col-name">${col.label}</div>
+          <div class="kb-col-count">${cards.length} US</div>
+        </div>
+        <div class="kb-col-body">
+          ${cards.map(storyCard).join('') || '<div style="padding:8px;font-size:.7rem;color:var(--muted);text-align:center">—</div>'}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function storyCard(s) {
+  const statusCls = {
+    backlog: '', dev: 'running', qa: 'running',
+    qa_approved: 'completed', qa_rejected: 'failed',
+    deployed: 'completed', done: 'completed'
+  }[s.status] || '';
+
+  const prdBadge = s.prd_title ? `<div class="kb-card-sprint">${s.prd_title.slice(0,35)}</div>` : '';
+  const filesBadge = s.dev_files > 0 ? `<span class="kb-card-stories">${s.dev_files} arq.</span>` : '';
+  const qaNote = s.qa_notes ? `<div class="kb-card-blocker">${s.qa_notes.slice(0, 60)}${s.qa_notes.length > 60 ? '…' : ''}</div>` : '';
+
+  return `
+    <div class="kb-card ${statusCls}">
+      ${prdBadge}
+      <div class="kb-card-title">${s.story_id} — ${s.title.slice(0,40)}${s.title.length > 40 ? '…' : ''}</div>
+      <div class="kb-card-meta">${filesBadge}</div>
+      <span class="kb-card-status ${statusCls}">${s.status.replace('_', ' ')}</span>
+      ${qaNote}
+    </div>`;
+}
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 init();
