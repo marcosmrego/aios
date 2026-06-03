@@ -525,42 +525,58 @@ function renderStoriesKanban(stories) {
 }
 
 // ── Story tooltip ─────────────────────────────────────────────────────────────
-const _tooltip = { el: null, visible: false };
+const _storyMap = new Map();   // story_id → story object
+const _tt = { el: null };
+
+const STATUS_LABELS = {
+  backlog: 'Backlog', dev: 'Em desenvolvimento', qa: 'Em QA',
+  qa_approved: 'QA Aprovado', qa_rejected: 'QA Reprovado',
+  deployed: 'Deploy realizado', done: 'Concluído'
+};
 
 function _initTooltip() {
-  _tooltip.el = document.getElementById('story-tooltip');
+  _tt.el = document.getElementById('story-tooltip');
+
   document.addEventListener('mousemove', (e) => {
-    if (!_tooltip.visible) return;
-    const t = _tooltip.el;
-    const margin = 16;
-    let x = e.clientX + margin;
-    let y = e.clientY + margin;
-    if (x + 320 > window.innerWidth)  x = e.clientX - 320 - margin;
-    if (y + t.offsetHeight > window.innerHeight) y = e.clientY - t.offsetHeight - margin;
+    const t = _tt.el;
+    if (!t || !t.classList.contains('visible')) return;
+    const m = 16, w = 300;
+    let x = e.clientX + m;
+    let y = e.clientY + m;
+    if (x + w + m > window.innerWidth)  x = e.clientX - w - m;
+    if (y + t.offsetHeight + m > window.innerHeight) y = e.clientY - t.offsetHeight - m;
     t.style.left = x + 'px';
     t.style.top  = y + 'px';
   });
+
+  // Delegate hover events on stories-board
+  document.addEventListener('mouseover', (e) => {
+    const card = e.target.closest('[data-story-id]');
+    if (!card) return;
+    const s = _storyMap.get(card.dataset.storyId);
+    if (s) _showTooltip(e, s);
+  });
+
+  document.addEventListener('mouseout', (e) => {
+    const card = e.target.closest('[data-story-id]');
+    if (!card) return;
+    const rel = e.relatedTarget;
+    if (!rel || !card.contains(rel)) _hideTooltip();
+  });
 }
 
-function showStoryTooltip(e, s) {
-  const t = _tooltip.el;
+function _showTooltip(e, s) {
+  const t = _tt.el;
   if (!t) return;
-
-  const statusLabels = {
-    backlog: 'Backlog', dev: 'Em desenvolvimento', qa: 'Em QA',
-    qa_approved: 'QA Aprovado', qa_rejected: 'QA Reprovado',
-    deployed: 'Deploy realizado', done: 'Concluído'
-  };
-  const statusCls = `story-tooltip-status-${s.status}`;
-
+  const cls = `story-tooltip-status-${s.status}`;
   const rows = [
-    ['Projeto',  s.project || '—'],
-    ['Épico',    s.epic_id || '—'],
-    ['Sprint',   s.sprint  || '—'],
+    ['Projeto',  s.project  || '—'],
+    ['Épico',    `${s.epic_id || '—'} ${s.epic_title ? '· ' + s.epic_title.slice(0,28) : ''}`],
+    ['Sprint',   s.sprint   || '—'],
+    ['Status',   `<span class="${cls}">${STATUS_LABELS[s.status] || s.status}</span>`],
     ['Arquivos', s.dev_files > 0 ? `${s.dev_files} gerados` : '—'],
     ['QA',       s.qa_result || '—'],
   ];
-
   t.innerHTML = `
     <div class="story-tooltip-id">${s.story_id}</div>
     <div class="story-tooltip-title">${s.title}</div>
@@ -569,46 +585,36 @@ function showStoryTooltip(e, s) {
         <span class="story-tooltip-label">${l}</span>
         <span class="story-tooltip-value">${v}</span>
       </div>`).join('')}
-    <div class="story-tooltip-row">
-      <span class="story-tooltip-label">Status</span>
-      <span class="story-tooltip-value ${statusCls}">${statusLabels[s.status] || s.status}</span>
-    </div>
-    ${s.qa_notes ? `<div class="story-tooltip-notes">⚠ ${s.qa_notes}</div>` : ''}
-  `;
-
+    ${s.qa_notes ? `<div class="story-tooltip-notes">⚠ ${s.qa_notes}</div>` : ''}`;
   t.style.left = (e.clientX + 16) + 'px';
   t.style.top  = (e.clientY + 16) + 'px';
   t.classList.add('visible');
-  _tooltip.visible = true;
 }
 
-function hideStoryTooltip() {
-  if (_tooltip.el) _tooltip.el.classList.remove('visible');
-  _tooltip.visible = false;
+function _hideTooltip() {
+  if (_tt.el) _tt.el.classList.remove('visible');
 }
 
 function storyCard(s) {
+  // Register story in map for tooltip lookup
+  _storyMap.set(s.story_id, s);
+
   const statusCls = {
     backlog: '', dev: 'running', qa: 'running',
     qa_approved: 'completed', qa_rejected: 'failed',
     deployed: 'completed', done: 'completed'
   }[s.status] || '';
 
-  const epicBadge = s.epic_id ? `<div class="kb-card-sprint">${s.epic_id}</div>` : '';
+  const epicBadge  = s.epic_id  ? `<div class="kb-card-sprint">${s.epic_id}</div>` : '';
   const filesBadge = s.dev_files > 0 ? `<span class="kb-card-stories">${s.dev_files} arq.</span>` : '';
-  const qaNote = s.qa_notes ? `<div class="kb-card-blocker">${s.qa_notes.slice(0, 55)}${s.qa_notes.length > 55 ? '…' : ''}</div>` : '';
-
-  // Encode story data for tooltip
-  const data = encodeURIComponent(JSON.stringify(s));
+  const qaNote     = s.qa_notes ? `<div class="kb-card-blocker">${s.qa_notes.slice(0,55)}${s.qa_notes.length > 55 ? '…' : ''}</div>` : '';
 
   return `
-    <div class="kb-card ${statusCls}"
-         onmouseenter="showStoryTooltip(event, JSON.parse(decodeURIComponent('${data}')))"
-         onmouseleave="hideStoryTooltip()">
+    <div class="kb-card ${statusCls}" data-story-id="${s.story_id}">
       ${epicBadge}
       <div class="kb-card-title">${s.story_id} — ${s.title.slice(0,38)}${s.title.length > 38 ? '…' : ''}</div>
       <div class="kb-card-meta">${filesBadge}</div>
-      <span class="kb-card-status ${statusCls}">${s.status.replace('_', ' ')}</span>
+      <span class="kb-card-status ${statusCls}">${s.status.replace('_',' ')}</span>
       ${qaNote}
     </div>`;
 }
