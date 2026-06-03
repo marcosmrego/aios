@@ -74,5 +74,9 @@ class Settings(BaseSettings):
     dashboard_password: str = "aios2026"
     dashboard_secret_key: str = "aios-dashboard-secret-change-me"
 
+    # Anthropic credit tracking (set manually after each top-up)
+    anthropic_credit_balance: float = 0.0       # saldo atual em USD
+    anthropic_credit_updated_at: str = ""        # ISO date do último top-up, ex: "2026-06-03"
+
 
 settings = Settings()  # type: ignore[call-arg]

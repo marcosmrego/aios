@@ -27,7 +27,7 @@ async function apiFetch(path, opts = {}) {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
-  await Promise.all([loadCosts(), loadRuns()]);
+  await Promise.all([loadCosts(), loadRuns(), loadCredits()]);
   connectSSE();
 }
 
@@ -43,6 +43,43 @@ async function loadCosts() {
 }
 
 function fmt$(v) { return `USD ${Number(v).toFixed(4)}`; }
+
+// ── Credits ───────────────────────────────────────────────────────────────────
+async function loadCredits() {
+  const data = await apiFetch('/dashboard/credits');
+  if (!data) return;
+
+  const el = document.getElementById('credits-remaining');
+  const bar = document.getElementById('credits-bar');
+  const detail = document.getElementById('credits-detail');
+  const sub = document.getElementById('credits-sub');
+
+  if (data.source === 'not_configured') {
+    el.textContent = 'N/C';
+    detail.textContent = 'Configure ANTHROPIC_CREDIT_BALANCE no .env ou use o campo ao lado';
+    return;
+  }
+
+  const rem = data.estimated_remaining;
+  const pct = data.percent_remaining;
+  el.textContent = fmt$(rem);
+  sub.textContent = `estimado restante (${pct}%)`;
+
+  const cls = pct < 10 ? 'danger' : pct < 30 ? 'warn' : '';
+  el.className = 'credits-remaining ' + cls;
+  bar.className = 'credits-bar ' + cls;
+  bar.style.width = pct + '%';
+
+  detail.textContent = `Gasto desde ${data.updated_at}: ${fmt$(data.spent_since_topup)} | Saldo informado: ${fmt$(data.known_balance)}`;
+}
+
+async function updateCredits() {
+  const val = parseFloat(document.getElementById('credits-input').value);
+  if (!val || isNaN(val)) return;
+  await apiFetch(`/dashboard/credits/update?balance=${val}`, { method: 'POST' });
+  document.getElementById('credits-input').value = '';
+  await loadCredits();
+}
 
 // ── Runs ──────────────────────────────────────────────────────────────────────
 async function loadRuns() {

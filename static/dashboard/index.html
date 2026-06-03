@@ -40,6 +40,30 @@
   </div>
 </section>
 
+<!-- Anthropic credits -->
+<section class="credits-section">
+  <div class="credits-card" id="credits-card">
+    <div class="credits-left">
+      <div class="credits-title">⚡ Saldo Anthropic</div>
+      <div class="credits-values">
+        <span class="credits-remaining" id="credits-remaining">—</span>
+        <span class="credits-sub" id="credits-sub">estimado restante</span>
+      </div>
+      <div class="credits-bar-wrap">
+        <div class="credits-bar" id="credits-bar" style="width:0%"></div>
+      </div>
+      <div class="credits-detail" id="credits-detail">Configure ANTHROPIC_CREDIT_BALANCE no .env</div>
+    </div>
+    <div class="credits-right">
+      <div class="credits-update">
+        <input type="number" id="credits-input" placeholder="Novo saldo USD" step="0.01" min="0">
+        <button onclick="updateCredits()">Atualizar</button>
+      </div>
+      <div class="credits-note">Informe após cada recarga</div>
+    </div>
+  </div>
+</section>
+
 <!-- Active runs -->
 <section>
   <div class="section-header">
