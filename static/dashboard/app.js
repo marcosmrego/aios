@@ -757,13 +757,30 @@ function storyCard(s) {
   const epicBadge  = s.epic_id  ? `<div class="kb-card-sprint">${s.epic_id}</div>` : '';
   const filesBadge = s.dev_files > 0 ? `<span class="kb-card-stories">${s.dev_files} arq.</span>` : '';
 
+  let actionBtn = '';
+  if (s.status === 'qa_approved') {
+    actionBtn = `<button class="story-action-btn deploy" onclick="event.stopPropagation();moveStory('${s.sprint}','${s.story_id}','deploy_ready')">🚀 Fila de Deploy</button>`;
+  } else if (s.status === 'qa_rejected') {
+    actionBtn = `<button class="story-action-btn dev" onclick="event.stopPropagation();moveStory('${s.sprint}','${s.story_id}','dev')">🔧 Voltar ao Dev</button>`;
+  }
+
   return `
     <div class="kb-card ${statusCls}" data-story-id="${s.story_id}">
       ${epicBadge}
       <div class="kb-card-title">${s.story_id} — ${s.title.slice(0,38)}${s.title.length > 38 ? '…' : ''}</div>
       <div class="kb-card-meta">${filesBadge}</div>
       <span class="kb-card-status ${statusCls}">${s.status.replace('_',' ')}</span>
+      ${actionBtn}
     </div>`;
+}
+
+// ── Story actions ────────────────────────────────────────────────────────────
+async function moveStory(sprint, storyId, status) {
+  await apiFetch(`/dashboard/stories/${sprint}/${storyId}/status`, {
+    method: 'POST',
+    body: JSON.stringify({ status }),
+  });
+  // SSE story_update vai atualizar o kanban automaticamente
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────────

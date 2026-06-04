@@ -159,6 +159,21 @@ def list_sprints(user: str = Depends(_auth)) -> list[str]:
         c.close()
 
 
+class StoryStatusUpdate(BaseModel):
+    status: str  # "deploy_ready" | "dev" | "qa" | etc.
+
+
+@router.post("/stories/{sprint}/{story_id}/status")
+async def update_story_status(sprint: str, story_id: str, body: StoryStatusUpdate,
+                               user: str = Depends(_auth)) -> dict:
+    from tools.run_tracker import upsert_story  # noqa: PLC0415
+    allowed = {"deploy_ready", "dev", "qa", "qa_approved", "qa_rejected", "deployed", "done"}
+    if body.status not in allowed:
+        raise HTTPException(status_code=400, detail=f"status inválido: {body.status}")
+    upsert_story(sprint=sprint, story_id=story_id, status=body.status)
+    return {"ok": True, "sprint": sprint, "story_id": story_id, "status": body.status}
+
+
 @router.get("/agents/today")
 def agents_today(user: str = Depends(_auth)) -> list[dict]:
     from tools.usage_tracker import query_today_agents  # noqa: PLC0415
