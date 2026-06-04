@@ -230,8 +230,17 @@ async function loadRuns() {
   const data = await apiFetch('/dashboard/runs');
   if (!data) return;
   allRuns = data;
+  _populateRunSprintFilter();
   renderRuns();
   renderKanban();
+}
+
+function _populateRunSprintFilter() {
+  const sel = document.getElementById('kanban-filter-sprint');
+  if (!sel || sel.options.length > 1) return;
+  const sprints = [...new Set(allRuns.map(r => _sprint(r)))].sort().reverse();
+  sel.innerHTML = `<option value="">Todos os sprints</option>` +
+    sprints.map(s => `<option value="${s}">${s}</option>`).join('');
 }
 
 function renderRuns() {
@@ -256,8 +265,12 @@ const STAGE_LABELS = {
 
 // ── Kanban board ─────────────────────────────────────────────────────────────
 function renderKanban() {
-  const filter = document.getElementById('kanban-filter').value;
-  const runs = filter ? allRuns.filter(r => r.project === filter) : allRuns;
+  const filterProject = document.getElementById('kanban-filter-project')?.value || '';
+  const filterSprint  = document.getElementById('kanban-filter-sprint')?.value  || '';
+  const runs = allRuns.filter(r =>
+    (!filterProject || r.project === filterProject) &&
+    (!filterSprint  || _sprint(r) === filterSprint)
+  );
   const board = document.getElementById('kanban-board');
 
   // Build columns: one per stage + "Concluído"

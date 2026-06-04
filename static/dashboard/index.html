@@ -76,10 +76,16 @@
     <span style="color:var(--muted);font-size:.85rem">Cada card = uma execução do pipeline</span>
     <div style="display:flex;gap:10px;align-items:center">
       <span class="dot-live"></span>
-      <select id="kanban-filter" onchange="renderKanban()">
+      <select id="kanban-filter-project" onchange="renderKanban()">
         <option value="">Todos os projetos</option>
-        <option value="expansao">Expansão AI</option>
-        <option value="cwi">CWI Software</option>
+        <option value="climate">🌦 Climate</option>
+        <option value="grc-flow">📋 GRC Flow</option>
+        <option value="aios">⚡ AIOS</option>
+        <option value="cwi">🏢 CWI</option>
+        <option value="expansao">🚀 Expansão AI</option>
+      </select>
+      <select id="kanban-filter-sprint" onchange="renderKanban()">
+        <option value="">Todos os sprints</option>
       </select>
     </div>
   </div>
@@ -92,10 +98,11 @@
     <h2 style="font-size:.9rem">Histórico de execuções</h2>
     <select id="filter-project" onchange="renderRuns()">
       <option value="">Todos os projetos</option>
-      <option value="expansao">Expansão AI</option>
-      <option value="cwi">CWI Software</option>
-      <option value="climate">Climate</option>
-      <option value="grc-flow">GRC Flow</option>
+      <option value="climate">🌦 Climate</option>
+      <option value="grc-flow">📋 GRC Flow</option>
+      <option value="aios">⚡ AIOS</option>
+      <option value="cwi">🏢 CWI</option>
+      <option value="expansao">🚀 Expansão AI</option>
     </select>
   </div>
   <div id="runs-list" class="runs-list">
