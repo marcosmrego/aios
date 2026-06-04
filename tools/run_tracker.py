@@ -343,7 +343,7 @@ def get_run_detail(run_id: str) -> dict | None:
         c.close()
 
 
-def upsert_story(sprint: str, story_id: str, title: str = "", project: str = "expansao",
+def upsert_story(sprint: str, story_id: str, title: str = "", project: str = "",
                  epic_id: str = "", epic_title: str = "", prd_title: str = "",
                  status: str = "backlog", dev_files: int = 0,
                  qa_result: str = "", qa_notes: str = "") -> None:
@@ -356,10 +356,10 @@ def upsert_story(sprint: str, story_id: str, title: str = "", project: str = "ex
                 INSERT INTO pipeline_stories
                     (sprint, story_id, title, project, epic_id, epic_title, prd_title,
                      status, dev_files, qa_result, qa_notes, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                VALUES (%s, %s, %s, COALESCE(NULLIF(%s,''),'expansao'), %s, %s, %s, %s, %s, %s, %s, NOW())
                 ON CONFLICT (sprint, story_id) DO UPDATE SET
                     title       = CASE WHEN EXCLUDED.title       != '' THEN EXCLUDED.title       ELSE pipeline_stories.title END,
-                    project     = CASE WHEN EXCLUDED.project     != '' THEN EXCLUDED.project     ELSE pipeline_stories.project END,
+                    project     = CASE WHEN EXCLUDED.project NOT IN ('','expansao') THEN EXCLUDED.project ELSE pipeline_stories.project END,
                     epic_id     = CASE WHEN EXCLUDED.epic_id     != '' THEN EXCLUDED.epic_id     ELSE pipeline_stories.epic_id END,
                     epic_title  = CASE WHEN EXCLUDED.epic_title  != '' THEN EXCLUDED.epic_title  ELSE pipeline_stories.epic_title END,
                     prd_title   = CASE WHEN EXCLUDED.prd_title   != '' THEN EXCLUDED.prd_title   ELSE pipeline_stories.prd_title END,
