@@ -247,9 +247,10 @@ function renderRuns() {
 }
 
 const STAGES_EXPANSAO = ['ceo', 'pm', 'architect', 'dev', 'qa', 'devops', 'marketing'];
+const STAGES_SPEC     = ['spec', 'pm', 'architect', 'dev', 'qa'];
 const STAGES_CWI = ['meeting-secretary', 'pmo', 'agile-coach', 'product', 'exec-reporting'];
 const STAGE_LABELS = {
-  ceo: 'CEO', pm: 'PM', architect: 'Arch', dev: 'Dev', qa: 'QA', devops: 'DevOps', marketing: 'Mktg',
+  spec: 'Spec', ceo: 'CEO', pm: 'PM', architect: 'Arch', dev: 'Dev', qa: 'QA', devops: 'DevOps', marketing: 'Mktg',
   'meeting-secretary': 'Secretary', pmo: 'PMO', 'agile-coach': 'Agile', product: 'Product', 'exec-reporting': 'Exec'
 };
 
@@ -392,7 +393,8 @@ function stageClass(stages, name, currentStage, runStatus) {
 }
 
 function runCard(run) {
-  const stageList = run.pipeline === 'cwi' ? STAGES_CWI : STAGES_EXPANSAO;
+  const hasSpecStage = (run.stages || []).some(s => s.stage_name === 'spec');
+  const stageList = run.pipeline === 'cwi' ? STAGES_CWI : hasSpecStage ? STAGES_SPEC : STAGES_EXPANSAO;
   const pills = stageList.map(s => {
     const cls = stageClass(run.stages, s, run.current_stage, run.status);
     return `<span class="stage-pill ${cls}">${STAGE_LABELS[s] || s}</span>`;
@@ -438,7 +440,8 @@ function renderModal(run) {
   const ctxEl = document.getElementById('modal-context');
   if (ctxEl) ctxEl.textContent = ctx || '—';
 
-  const stageList = run.pipeline === 'cwi' ? STAGES_CWI : STAGES_EXPANSAO;
+  const hasSpec = (run.stages || []).some(s => s.stage_name === 'spec');
+  const stageList = run.pipeline === 'cwi' ? STAGES_CWI : hasSpec ? STAGES_SPEC : STAGES_EXPANSAO;
   document.getElementById('modal-kanban').innerHTML = `
     <table class="modal-stages-table">
       <thead><tr><th>Agente</th><th>Status</th><th>Stories / Resumo</th><th>Custo</th><th>Tokens</th></tr></thead>

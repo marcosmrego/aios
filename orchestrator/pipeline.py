@@ -201,6 +201,91 @@ def run_pipeline(extra_context: str = "", start_from: str = "ceo", force: bool =
     console.rule("[bold green]Pipeline Complete[/]")
 
 
+def run_pipeline_from_spec(input_file: str, project: str = "grc-flow", extra_context: str = "") -> None:
+    """
+    Spec → PM → Architect → Dev → QA pipeline.
+    Used when a functional spec document is the starting point instead of the CEO backlog.
+    """
+    global _current_run_id
+    console.rule("[bold green]Expansão AI OS — Pipeline from Spec[/]")
+
+    _current_run_id = new_run_id()
+    start_run(_current_run_id, project=project, pipeline="expansao",
+              extra_context=extra_context or f"Spec: {Path(input_file).name}")
+    emit_event({"type": "run_update", "run_id": _current_run_id, "status": "running"})
+
+    spec_stages = ["spec", "pm", "architect", "dev", "qa"]
+    for s in spec_stages:
+        start_stage(_current_run_id, s)
+
+    # ── Stage 1: Spec ─────────────────────────────────────────────────────────
+    start_stage(_current_run_id, "spec")
+    emit_event({"type": "stage_update", "run_id": _current_run_id, "stage": "spec", "status": "running"})
+    from orchestrator.agents.spec_agent import SpecAgent  # noqa: PLC0415
+    spec_result = SpecAgent().run(input_file=input_file, pipeline="Expansão AI")
+    complete_stage(_current_run_id, "spec", status="completed",
+                   output_summary=f"Spec gerada: {Path(spec_result.get('md', '')).name}")
+    emit_event({"type": "stage_update", "run_id": _current_run_id, "stage": "spec", "status": "completed"})
+
+    # ── Stage 2: PM ───────────────────────────────────────────────────────────
+    start_stage(_current_run_id, "pm")
+    emit_event({"type": "stage_update", "run_id": _current_run_id, "stage": "pm", "status": "running"})
+    from orchestrator.agents.pm_agent import PMAgent  # noqa: PLC0415
+    pm_output = PMAgent().run(spec_data=spec_result.get("spec", {}))
+    _stage_done(_current_run_id, "pm", pm_output,
+                summary=f"{len(pm_output.get('prds', []))} PRD(s) gerados")
+    if not pm_output.get("human_approved"):
+        console.print("[red bold]Pipeline stopped at PM gate.[/]")
+        update_run(_current_run_id, "paused", error_msg="Gate PM rejeitado")
+        return
+
+    # ── Stages 3-5: Architect → Dev → QA ─────────────────────────────────────
+    # Reuse main pipeline from architect onwards
+    start_stage(_current_run_id, "architect")
+    emit_event({"type": "stage_update", "run_id": _current_run_id, "stage": "architect", "status": "running"})
+    from orchestrator.agents.architect_agent import ArchitectAgent  # noqa: PLC0415
+    architect_output = ArchitectAgent().run(pm_output=pm_output)
+    _stage_done(_current_run_id, "architect", architect_output)
+
+    start_stage(_current_run_id, "dev")
+    emit_event({"type": "stage_update", "run_id": _current_run_id, "stage": "dev", "status": "running"})
+    from orchestrator.agents.dev_agent import DevAgent  # noqa: PLC0415
+    dev_output = DevAgent().run(architect_output=architect_output, pm_output=pm_output)
+    n_impls = len(dev_output.get("implementations", []))
+    _stage_done(_current_run_id, "dev", dev_output, summary=f"{n_impls} stories implementadas")
+
+    start_stage(_current_run_id, "qa")
+    emit_event({"type": "stage_update", "run_id": _current_run_id, "stage": "qa", "status": "running"})
+    from orchestrator.agents.qa_agent import QAAgent  # noqa: PLC0415
+    qa_output = QAAgent().run(dev_output=dev_output, pm_output=pm_output,
+                              architect_output=architect_output)
+    _stage_done(_current_run_id, "qa", qa_output,
+                summary=f"{'APROVADO' if qa_output.get('approved') else 'REPROVADO'}")
+    if not qa_output.get("human_approved"):
+        update_run(_current_run_id, "paused", error_msg="Gate QA->Deploy aguardando")
+        return
+
+    if settings.deploy_queue_mode and "qa" in spec_stages:
+        qa_sprint = qa_output.get("sprint", "")
+        if qa_sprint:
+            from tools.run_tracker import upsert_story  # noqa: PLC0415
+            for report in qa_output.get("reports", []):
+                sid = report.get("story_id")
+                if sid:
+                    try:
+                        upsert_story(sprint=qa_sprint, story_id=sid, status="deploy_ready")
+                    except Exception:
+                        pass
+        console.print("[yellow bold]Stories enfileiradas para deploy às 22:00.[/]")
+        update_run(_current_run_id, "paused", error_msg="Deploy queue — aguardando 22:00")
+        emit_event({"type": "run_update", "run_id": _current_run_id, "status": "paused"})
+        return
+
+    update_run(_current_run_id, "completed")
+    emit_event({"type": "run_update", "run_id": _current_run_id, "status": "completed"})
+    console.rule("[bold green]Pipeline from Spec — Complete[/]")
+
+
 def _stage_done(run_id: str, stage: str, output: dict, summary: str = "") -> None:
     cost = output.get("_stage_cost", 0.0)
     complete_stage(run_id, stage, status="completed", cost_usd=cost, output_summary=summary or str(output)[:200])

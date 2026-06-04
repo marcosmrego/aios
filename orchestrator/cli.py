@@ -42,6 +42,14 @@ def run(
         raise typer.Exit(1)
 
     if agent == "all":
+        if start_from == "spec" or (input_file and not start_from):
+            if not input_file:
+                console.print("[red]--input obrigatório para --start-from spec[/]")
+                raise typer.Exit(1)
+            from orchestrator.pipeline import run_pipeline_from_spec  # noqa: PLC0415
+            run_pipeline_from_spec(input_file=input_file, project=project or "grc-flow",
+                                   extra_context=context)
+            return
         from orchestrator.pipeline import run_pipeline  # noqa: PLC0415
         run_pipeline(
             extra_context=context,
