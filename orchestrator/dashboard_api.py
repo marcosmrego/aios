@@ -171,6 +171,7 @@ async def update_story_status(sprint: str, story_id: str, body: StoryStatusUpdat
     if body.status not in allowed:
         raise HTTPException(status_code=400, detail=f"status inválido: {body.status}")
     upsert_story(sprint=sprint, story_id=story_id, status=body.status)
+    await broadcast({"type": "story_update", "sprint": sprint, "story_id": story_id, "status": body.status})
     return {"ok": True, "sprint": sprint, "story_id": story_id, "status": body.status}
 
 

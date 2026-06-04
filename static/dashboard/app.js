@@ -780,7 +780,7 @@ async function moveStory(sprint, storyId, status) {
     method: 'POST',
     body: JSON.stringify({ status }),
   });
-  // SSE story_update vai atualizar o kanban automaticamente
+  loadStories(); // atualiza imediatamente, SSE também vai disparar
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────────
