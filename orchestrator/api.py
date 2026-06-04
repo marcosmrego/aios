@@ -199,6 +199,40 @@ async def expansao_run(req: PipelineRequest, background_tasks: BackgroundTasks) 
     return {"status": "triggered", "pipeline": "expansao", "start_from": req.start_from or "ceo"}
 
 
+@app.post("/expansao/deploy-queue/execute")
+async def deploy_queue_execute(background_tasks: BackgroundTasks) -> dict:
+    """
+    Called by N8N at 22:00. Triggers DevOps stage if stories are queued for deploy.
+    Skips silently if nothing is queued or DevOps already ran today.
+    """
+    import json as _json  # noqa: PLC0415
+    from datetime import date  # noqa: PLC0415
+    from pathlib import Path  # noqa: PLC0415
+
+    out_dir = Path("outputs/")
+    week = date.today().strftime("%Y-W%V")
+    safe_week = week.replace("-", "_")
+
+    qa_files = sorted(out_dir.glob(f"qa_*{safe_week}*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not qa_files:
+        return {"skipped": True, "reason": "no qa output for current week"}
+
+    try:
+        qa_data = _json.loads(qa_files[0].read_text(encoding="utf-8"))
+    except Exception:
+        return {"skipped": True, "reason": "could not read qa output"}
+
+    if not qa_data.get("human_approved"):
+        return {"skipped": True, "reason": "qa gate not approved yet"}
+
+    devops_files = list(out_dir.glob(f"devops_*{safe_week}*.json"))
+    if devops_files:
+        return {"skipped": True, "reason": "devops already ran this week"}
+
+    background_tasks.add_task(_run_in_thread, _do_expansao_pipeline, "", "devops")
+    return {"triggered": True, "starting_from": "devops", "week": week}
+
+
 @app.post("/expansao/ceo")
 async def expansao_ceo(req: RunAgentRequest, background_tasks: BackgroundTasks) -> dict:
     """Trigger CEO Agent only."""

@@ -121,6 +121,36 @@ def log_run(
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
+def query_today_agents() -> list[dict[str, Any]]:
+    """Return today's agent runs grouped by agent_name + model, ordered by cost."""
+    if not settings.database_url:
+        return []
+    try:
+        import psycopg2.extras  # noqa: PLC0415
+        conn = _get_connection()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT agent_name, model,
+                       COUNT(*)                        AS runs,
+                       COALESCE(SUM(input_tokens),  0) AS input_tokens,
+                       COALESCE(SUM(output_tokens), 0) AS output_tokens,
+                       COALESCE(SUM(cost_usd),      0) AS cost_usd
+                FROM agent_runs
+                WHERE run_at::date = CURRENT_DATE
+                GROUP BY agent_name, model
+                ORDER BY cost_usd DESC
+            """)
+            rows = [dict(r) for r in cur.fetchall()]
+        conn.close()
+        return [
+            {k: float(v) if k not in ("agent_name", "model", "runs") else (int(v) if k == "runs" else v)
+             for k, v in r.items()}
+            for r in rows
+        ]
+    except Exception:
+        return []
+
+
 def query_summary(days: int = 30) -> dict[str, Any]:
     """Aggregate cost and usage by project and agent for the past N days."""
     if settings.database_url:

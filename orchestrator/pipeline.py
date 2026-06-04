@@ -159,6 +159,23 @@ def run_pipeline(extra_context: str = "", start_from: str = "ceo", force: bool =
             update_run(_current_run_id, "paused", error_msg="Gate QA->Deploy rejeitado")
             return
 
+        # Deploy queue mode: enqueue stories and wait for 22:00 trigger
+        if settings.deploy_queue_mode and "devops" not in active_stages[1:]:
+            qa_sprint = qa_output.get("sprint", "")
+            if qa_sprint:
+                from tools.run_tracker import upsert_story  # noqa: PLC0415
+                for report in qa_output.get("reports", []):
+                    sid = report.get("story_id")
+                    if sid:
+                        try:
+                            upsert_story(sprint=qa_sprint, story_id=sid, status="deploy_ready")
+                        except Exception:
+                            pass
+            console.print("[yellow bold]Stories enfileiradas para deploy às 22:00.[/]")
+            update_run(_current_run_id, "paused", error_msg="Deploy queue — aguardando 22:00")
+            emit_event({"type": "run_update", "run_id": _current_run_id, "status": "paused"})
+            return
+
     # ── Stage 6: DevOps ───────────────────────────────────────────────
     if "devops" in active_stages:
         start_stage(_current_run_id, "devops")
@@ -220,12 +237,15 @@ def _auto_detect_resume() -> str:
             except Exception:
                 return stage
 
-        # QA: if output exists but not approved, resume from dev (not devops)
+        # QA: check gate decision (human_approved), not QA verdict (approved)
         if stage == "qa":
             try:
                 data = json.loads(files[0].read_text(encoding="utf-8"))
-                if not data.get("approved"):
-                    return "dev"
+                if "human_approved" not in data:
+                    return stage  # gate never reached (e.g. crash before gate)
+                if not data.get("human_approved"):
+                    return "dev"  # gate rejected → back to dev
+                # gate passed → continue checking devops
             except Exception:
                 return stage
 

@@ -2,7 +2,7 @@ agents:
   ceo:
     name: "CEO Agent"
     role: "Chief Executive Officer"
-    model: "${CEO_MODEL:-claude-opus-4-8}"
+    model: "${CEO_MODEL:-claude-sonnet-4-6}"
     max_tokens: 4096
     prompt_file: "agents/prompts/ceo.md"
     outputs:

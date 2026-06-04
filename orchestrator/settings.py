@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     cwi_watch_interval_seconds: int = 120
 
     # Expansao AI agent models
-    ceo_model: str = "claude-opus-4-8"
+    ceo_model: str = "claude-sonnet-4-6"
     pm_model: str = "claude-sonnet-4-6"
     architect_model: str = "claude-sonnet-4-6"
     dev_model: str = "claude-sonnet-4-6"
@@ -66,6 +66,7 @@ class Settings(BaseSettings):
 
     # Orchestrator behavior
     human_in_the_loop: bool = True
+    deploy_queue_mode: bool = True   # queue deploys after QA gate; execute daily at 22:00
     output_dir: str = "outputs/"
     log_level: str = "INFO"
 

@@ -85,6 +85,18 @@ CREATE TABLE IF NOT EXISTS gate_decisions (
 """
 
 
+_active_run_id: str = ""
+
+
+def set_active_run_id(run_id: str) -> None:
+    global _active_run_id
+    _active_run_id = run_id
+
+
+def get_active_run_id() -> str:
+    return _active_run_id
+
+
 def _conn():
     from orchestrator.settings import settings  # noqa: PLC0415
     import psycopg2  # noqa: PLC0415
@@ -104,6 +116,7 @@ def new_run_id() -> str:
 
 
 def start_run(run_id: str, project: str, pipeline: str, extra_context: str = "") -> None:
+    set_active_run_id(run_id)
     c = _conn()
     if not c:
         return

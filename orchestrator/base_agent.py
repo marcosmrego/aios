@@ -136,8 +136,32 @@ class BaseAgent:
         return path
 
     def _await_human_approval(self, gate_id: str, context_summary: str) -> bool:
-        """Block until a human approves or rejects the gate (CLI mode)."""
+        """Block until a human approves or rejects the gate.
+
+        When HUMAN_IN_THE_LOOP=false and a database is configured, registers the
+        gate as pending and polls until the dashboard records a decision. Without a
+        database, auto-approves immediately.
+        """
         if not settings.human_in_the_loop:
+            if settings.database_url:
+                try:
+                    from tools.run_tracker import get_active_run_id, get_gate_decision, set_gate  # noqa: PLC0415
+                    from orchestrator.dashboard_api import emit_event  # noqa: PLC0415
+                    run_id = get_active_run_id()
+                    if run_id:
+                        set_gate(run_id, gate_id, "pending")
+                        emit_event({"type": "gate_pending", "run_id": run_id, "gate_id": gate_id})
+                        console.print(f"\n[yellow bold][GATE] Aguardando decisão no dashboard: {gate_id}[/]")
+                        console.print(f"[dim]{context_summary}[/]\n")
+                        while True:
+                            decision = get_gate_decision(run_id, gate_id)
+                            if decision != "pending":
+                                approved = decision == "approved"
+                                console.print(f"[{'green' if approved else 'red'}]Gate '{gate_id}': {decision}[/]")
+                                return approved
+                            time.sleep(5)
+                except Exception:
+                    pass
             return True
         console.print(f"\n[yellow bold][GATE] Human gate: {gate_id}[/]")
         console.print(f"[dim]{context_summary}[/]\n")

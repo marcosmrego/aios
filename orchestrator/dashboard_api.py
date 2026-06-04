@@ -159,6 +159,35 @@ def list_sprints(user: str = Depends(_auth)) -> list[str]:
         c.close()
 
 
+@router.get("/agents/today")
+def agents_today(user: str = Depends(_auth)) -> list[dict]:
+    from tools.usage_tracker import query_today_agents  # noqa: PLC0415
+    return _serialize(query_today_agents())
+
+
+@router.get("/agents/config")
+def agents_config(user: str = Depends(_auth)) -> dict:
+    from orchestrator.settings import settings as s  # noqa: PLC0415
+    return {
+        "expansao": [
+            {"agent": "CEO",       "model": s.ceo_model},
+            {"agent": "PM",        "model": s.pm_model},
+            {"agent": "Architect", "model": s.architect_model},
+            {"agent": "Dev",       "model": s.dev_model},
+            {"agent": "QA",        "model": s.qa_model},
+            {"agent": "DevOps",    "model": s.devops_model},
+            {"agent": "Marketing", "model": s.marketing_model},
+        ],
+        "cwi": [
+            {"agent": "Meeting Secretary", "model": s.secretary_model},
+            {"agent": "PMO",               "model": s.pmo_model},
+            {"agent": "Agile Coach",       "model": s.agile_coach_model},
+            {"agent": "Product",           "model": s.product_model},
+            {"agent": "Exec Report",       "model": s.exec_report_model},
+        ],
+    }
+
+
 @router.get("/credits")
 def get_credits(user: str = Depends(_auth)) -> dict:
     from tools.run_tracker import get_credit_summary  # noqa: PLC0415

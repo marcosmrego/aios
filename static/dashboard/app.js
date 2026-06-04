@@ -28,9 +28,97 @@ async function apiFetch(path, opts = {}) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   _initTooltip();
-  await Promise.all([loadCosts(), loadRuns()]);
+  await Promise.all([loadCosts(), loadRuns(), loadAgentsToday()]);
   loadStories();
   connectSSE();
+}
+
+// ── Agents today ──────────────────────────────────────────────────────────────
+let _agentsConfig = {};
+
+async function loadAgentsToday() {
+  const [today, cfg] = await Promise.all([
+    apiFetch('/dashboard/agents/today'),
+    apiFetch('/dashboard/agents/config'),
+  ]);
+  if (cfg) {
+    _agentsConfig = {};
+    [...(cfg.expansao || []), ...(cfg.cwi || [])].forEach(a => {
+      _agentsConfig[a.agent.toLowerCase()] = a.model;
+    });
+  }
+  renderAgentsToday(today || [], cfg || {});
+}
+
+const MODEL_SHORT = {
+  'claude-sonnet-4-6':         'Sonnet 4.6',
+  'claude-opus-4-8':           'Opus 4.8',
+  'claude-haiku-4-5-20251001': 'Haiku 4.5',
+};
+function shortModel(m) { return MODEL_SHORT[m] || m; }
+
+function renderAgentsToday(rows, cfg) {
+  const bar = document.getElementById('agents-today-bar');
+  if (!bar) return;
+
+  // Build config lookup: "QA Agent" → model from settings
+  const cfgLookup = {};
+  [...(cfg.expansao || []), ...(cfg.cwi || [])].forEach(a => {
+    cfgLookup[a.agent.toLowerCase()] = a.model;
+  });
+
+  // Merge activity rows with config to show all configured agents
+  const allAgents = [...(cfg.expansao || []), ...(cfg.cwi || [])];
+  const activityMap = {};
+  (rows || []).forEach(r => {
+    const key = r.agent_name.replace(/ agent$/i, '').toLowerCase();
+    activityMap[key] = r;
+  });
+
+  if (!rows.length && !allAgents.length) {
+    bar.innerHTML = '';
+    return;
+  }
+
+  // Today's activity table (only agents that ran today)
+  const activityHtml = rows.length ? `
+    <div class="agents-section">
+      <div class="agents-section-title">Agentes — hoje</div>
+      <table class="agents-table">
+        <thead><tr><th>Agente</th><th>Modelo</th><th>Chamadas</th><th>Tokens ↑↓</th><th>Custo</th></tr></thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr>
+              <td>${r.agent_name}</td>
+              <td><span class="model-badge">${shortModel(r.model)}</span></td>
+              <td style="color:var(--muted)">${r.runs}</td>
+              <td style="font-family:monospace;font-size:.78rem;color:var(--muted)">${fmtK(r.input_tokens)}↑ ${fmtK(r.output_tokens)}↓</td>
+              <td style="color:var(--orange);font-weight:600">${fmt$(r.cost_usd)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : '';
+
+  // Configured models card (always show)
+  const configHtml = allAgents.length ? `
+    <div class="agents-section">
+      <div class="agents-section-title">Modelos configurados</div>
+      <div class="model-config-grid">
+        ${allAgents.map(a => `
+          <div class="model-config-item">
+            <span class="model-config-agent">${a.agent}</span>
+            <span class="model-badge">${shortModel(a.model)}</span>
+          </div>`).join('')}
+      </div>
+    </div>` : '';
+
+  bar.innerHTML = `<div class="agents-bar-inner">${activityHtml}${configHtml}</div>`;
+}
+
+function fmtK(n) {
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n/1000).toFixed(0) + 'k';
+  return n;
 }
 
 // ── Costs ─────────────────────────────────────────────────────────────────────
@@ -44,7 +132,7 @@ async function loadCosts() {
   document.getElementById('cost-total').textContent  = fmt$(t.total  || 0);
 }
 
-function fmt$(v) { return `USD ${Number(v).toFixed(4)}`; }
+function fmt$(v) { return `USD ${Number(v).toFixed(2)}`; }
 
 // ── Credits ───────────────────────────────────────────────────────────────────
 async function loadCredits() {
@@ -337,15 +425,19 @@ async function openRun(runId) {
 
 function renderModal(run) {
   const proj = { expansao: 'Expansão AI', cwi: 'CWI', climate: 'Climate', 'grc-flow': 'GRC Flow' }[run.project] || run.project;
-  document.getElementById('modal-title').textContent = `${proj} — ${_sprint(run)}`;
+  const sprint = _sprint(run);
+  document.getElementById('modal-title').textContent = `${proj} — ${sprint}`;
   document.getElementById('modal-run-id').textContent = run.run_id;
 
-  // Context description
+  // Load QA results if QA stage has run
+  const hasQA = (run.stages || []).some(s => s.stage_name === 'qa' && ['completed','running'].includes(s.status));
+  if (hasQA) loadModalQAStories(sprint);
+  else document.getElementById('modal-qa-section').classList.add('hidden');
+
   const ctx = run.extra_context || '';
   const ctxEl = document.getElementById('modal-context');
   if (ctxEl) ctxEl.textContent = ctx || '—';
 
-  // Stages table
   const stageList = run.pipeline === 'cwi' ? STAGES_CWI : STAGES_EXPANSAO;
   document.getElementById('modal-kanban').innerHTML = `
     <table class="modal-stages-table">
@@ -395,6 +487,45 @@ function formatDuration(ms) {
   return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
 }
 
+// ── QA results in run modal ───────────────────────────────────────────────────
+async function loadModalQAStories(sprint) {
+  const sec = document.getElementById('modal-qa-section');
+  const list = document.getElementById('modal-qa-list');
+  if (!sprint) { sec.classList.add('hidden'); return; }
+
+  const stories = await apiFetch(`/dashboard/stories?sprint=${sprint}`);
+  if (!stories || !stories.length) { sec.classList.add('hidden'); return; }
+
+  const qaStories = stories.filter(s => s.qa_result);
+  if (!qaStories.length) { sec.classList.add('hidden'); return; }
+
+  const VERDICT_LABEL = {
+    deploy:               { label: 'Deploy',            cls: 'completed' },
+    deploy_with_caveats:  { label: 'Deploy c/ ressalvas', cls: 'paused'    },
+    fix_required:         { label: 'Corrigir',           cls: 'failed'     },
+    block_deploy:         { label: 'Bloqueado',          cls: 'failed'     },
+  };
+
+  list.innerHTML = `
+    <table class="modal-stages-table">
+      <thead><tr><th>Story</th><th>Título</th><th>Resultado</th><th>Notas</th></tr></thead>
+      <tbody>
+        ${qaStories.map(s => {
+          const v = VERDICT_LABEL[s.qa_result] || { label: s.qa_result, cls: '' };
+          const rowCls = s.qa_result === 'fix_required' || s.qa_result === 'block_deploy'
+            ? 'style="background:rgba(248,81,73,.04)"' : '';
+          return `<tr ${rowCls}>
+            <td><strong>${s.story_id}</strong></td>
+            <td style="font-size:.8rem;color:var(--muted);max-width:180px">${(s.title||'').slice(0,50)}</td>
+            <td><span class="badge badge-${v.cls}">${v.label}</span></td>
+            <td style="font-size:.75rem;color:var(--muted);max-width:220px">${s.qa_notes || '—'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+  sec.classList.remove('hidden');
+}
+
 async function decideGate(runId, gateId, decision) {
   await apiFetch(`/dashboard/runs/${runId}/gate/${gateId}`, {
     method: 'POST', body: JSON.stringify({decision})
@@ -414,9 +545,10 @@ function connectSSE() {
   const es = new EventSource(`/dashboard/stream?token=${token}`);
   es.onmessage = (e) => {
     const evt = JSON.parse(e.data);
-    if (evt.type === 'run_update' || evt.type === 'stage_update' || evt.type === 'gate_decision') {
+    if (evt.type === 'run_update' || evt.type === 'stage_update' || evt.type === 'gate_decision' || evt.type === 'gate_pending') {
       loadRuns();  // also calls renderKanban()
       loadCosts();
+      loadAgentsToday();
       if (currentRunId === evt.run_id) openRun(evt.run_id);
     }
   };
@@ -439,13 +571,14 @@ function switchTab(tab) {
 
 // ── Stories kanban ────────────────────────────────────────────────────────────
 const STORY_COLS = [
-  { key: 'backlog',     label: '📋 Backlog',      cls: '' },
-  { key: 'dev',         label: '💻 Dev',           cls: '' },
-  { key: 'qa',          label: '🔍 QA',            cls: '' },
-  { key: 'qa_approved', label: '✅ QA Aprovado',   cls: 'done-col' },
-  { key: 'qa_rejected', label: '❌ QA Reprovado',  cls: 'has-failed' },
-  { key: 'deployed',    label: '🚀 Deploy',        cls: '' },
-  { key: 'done',        label: '🏁 Concluído',     cls: 'done-col' },
+  { key: 'backlog',       label: '📋 Backlog',         cls: '' },
+  { key: 'dev',           label: '💻 Dev',              cls: '' },
+  { key: 'qa',            label: '🔍 QA',               cls: '' },
+  { key: 'qa_approved',   label: '✅ QA Aprovado',      cls: 'done-col' },
+  { key: 'qa_rejected',   label: '❌ QA Reprovado',     cls: 'has-failed' },
+  { key: 'deploy_ready',  label: '🚀 Fila de Deploy',   cls: 'active' },
+  { key: 'deployed',      label: '🟢 Deployed',         cls: '' },
+  { key: 'done',          label: '🏁 Concluído',        cls: 'done-col' },
 ];
 
 let _allStories = [];
@@ -531,7 +664,7 @@ const _tt = { el: null };
 const STATUS_LABELS = {
   backlog: 'Backlog', dev: 'Em desenvolvimento', qa: 'Em QA',
   qa_approved: 'QA Aprovado', qa_rejected: 'QA Reprovado',
-  deployed: 'Deploy realizado', done: 'Concluído'
+  deploy_ready: 'Fila de Deploy', deployed: 'Deploy realizado', done: 'Concluído'
 };
 
 function _initTooltip() {
@@ -577,6 +710,17 @@ function _showTooltip(e, s) {
     ['Arquivos', s.dev_files > 0 ? `${s.dev_files} gerados` : '—'],
     ['QA',       s.qa_result || '—'],
   ];
+
+  // Format qa_notes as bullet list: "[CRITICAL] desc; [MEDIUM] desc" → bullets
+  let qaNotesHtml = '';
+  if (s.qa_notes) {
+    const bullets = s.qa_notes.split(';').map(n => n.trim()).filter(Boolean).map(n => {
+      const cls = n.startsWith('[CRITICAL]') ? 'color:var(--red)' : n.startsWith('[HIGH]') ? 'color:var(--orange)' : 'color:var(--muted)';
+      return `<div style="font-size:.72rem;${cls};padding:1px 0">• ${n}</div>`;
+    }).join('');
+    if (bullets) qaNotesHtml = `<div style="margin-top:6px;border-top:1px solid rgba(255,255,255,.08);padding-top:6px">${bullets}</div>`;
+  }
+
   t.innerHTML = `
     <div class="story-tooltip-id">${s.story_id}</div>
     <div class="story-tooltip-title">${s.title}</div>
@@ -585,7 +729,7 @@ function _showTooltip(e, s) {
         <span class="story-tooltip-label">${l}</span>
         <span class="story-tooltip-value">${v}</span>
       </div>`).join('')}
-    ${s.qa_notes ? `<div class="story-tooltip-notes">⚠ ${s.qa_notes}</div>` : ''}`;
+    ${qaNotesHtml}`;
   t.style.left = (e.clientX + 16) + 'px';
   t.style.top  = (e.clientY + 16) + 'px';
   t.classList.add('visible');
@@ -602,7 +746,7 @@ function storyCard(s) {
   const statusCls = {
     backlog: '', dev: 'running', qa: 'running',
     qa_approved: 'completed', qa_rejected: 'failed',
-    deployed: 'completed', done: 'completed'
+    deploy_ready: 'running', deployed: 'completed', done: 'completed'
   }[s.status] || '';
 
   const epicBadge  = s.epic_id  ? `<div class="kb-card-sprint">${s.epic_id}</div>` : '';

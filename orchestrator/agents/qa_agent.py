@@ -69,7 +69,17 @@ class QAAgent(BaseAgent):
                 from tools.run_tracker import upsert_story  # noqa: PLC0415
                 qa_status = "qa_approved" if not is_critical else "qa_rejected"
                 issues = report.get("code_quality", {}).get("issues", [])
-                notes = "; ".join(i.get("description", "") for i in issues[:2] if i.get("severity") == "critical")
+                # Build tooltip notes: critical first, then warnings, then failed criteria
+                note_parts = []
+                for i in issues[:4]:
+                    sev = i.get("severity", "").upper()
+                    desc = i.get("description", "")
+                    if sev and desc:
+                        note_parts.append(f"[{sev}] {desc}")
+                if not note_parts:
+                    failed = [r.get("criterion", "") for r in report.get("results", []) if not r.get("passed")]
+                    note_parts = [f"Critério falhou: {c}" for c in failed[:3]]
+                notes = "; ".join(note_parts)
                 upsert_story(sprint=sprint, story_id=sid,
                              status=qa_status, qa_result=rec, qa_notes=notes)
             except Exception:
@@ -87,24 +97,7 @@ class QAAgent(BaseAgent):
             ),
         }
 
-        safe_sprint = "".join(c if c.isalnum() or c in "-_" else "_" for c in sprint)
-        filename = f"qa_{safe_sprint}.json"
-        console.print(f"[dim]QA: {'APROVADO' if approved else 'REPROVADO'} — {critical_count} críticos[/]")
-        self._save_output(output, filename)
-
-        # Persist QA report to Notion
-        for report in output.get("reports", []):
-            self.notion.create_qa_report_page(sprint, report)
-
-        # Slack notification
-        status_icon = "[OK]" if approved else "[FAIL]"
-        if settings.slack_webhook_url_expansao and output.get("slack_summary"):
-            post_slack_message(
-                f"{status_icon} *QA Report — {sprint}*\n{output['slack_summary']}",
-                channel="expansao",
-            )
-
-        # Human-in-the-loop gate QA -> Deploy
+        # Human-in-the-loop gate QA -> Deploy (before save so human_approved is persisted)
         critical_issues = [
             issue
             for report in output.get("reports", [])
@@ -127,6 +120,26 @@ class QAAgent(BaseAgent):
             console.print("[red]Deploy rejeitado pelo humano. Retornando ao Dev Agent...[/]")
         else:
             console.print("[green]Deploy aprovado. Acionando DevOps Agent...[/]")
+
+        safe_sprint = "".join(c if c.isalnum() or c in "-_" else "_" for c in sprint)
+        filename = f"qa_{safe_sprint}.json"
+        console.print(f"[dim]QA: {'APROVADO' if approved else 'REPROVADO'} — {critical_count} críticos[/]")
+        self._save_output(output, filename)
+
+        # Persist QA report to Notion (non-fatal)
+        for report in output.get("reports", []):
+            try:
+                self.notion.create_qa_report_page(sprint, report)
+            except Exception as exc:
+                console.print(f"[yellow]Notion QA persist skipped: {exc}[/]")
+
+        # Slack notification
+        status_icon = "[OK]" if approved else "[FAIL]"
+        if settings.slack_webhook_url_expansao and output.get("slack_summary"):
+            post_slack_message(
+                f"{status_icon} *QA Report — {sprint}*\n{output['slack_summary']}",
+                channel="expansao",
+            )
 
         return output
 
