@@ -762,6 +762,8 @@ function storyCard(s) {
     actionBtn = `<button class="story-action-btn deploy" onclick="event.stopPropagation();moveStory('${s.sprint}','${s.story_id}','deploy_ready')">🚀 Fila de Deploy</button>`;
   } else if (s.status === 'qa_rejected') {
     actionBtn = `<button class="story-action-btn dev" onclick="event.stopPropagation();moveStory('${s.sprint}','${s.story_id}','dev')">🔧 Voltar ao Dev</button>`;
+  } else if (s.status === 'deployed') {
+    actionBtn = `<button class="story-action-btn done" onclick="event.stopPropagation();moveStory('${s.sprint}','${s.story_id}','done')">✅ Concluído</button>`;
   }
 
   return `

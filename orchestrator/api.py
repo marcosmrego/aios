@@ -202,35 +202,18 @@ async def expansao_run(req: PipelineRequest, background_tasks: BackgroundTasks) 
 @app.post("/expansao/deploy-queue/execute")
 async def deploy_queue_execute(background_tasks: BackgroundTasks) -> dict:
     """
-    Called by N8N at 22:00. Triggers DevOps stage if stories are queued for deploy.
-    Skips silently if nothing is queued or DevOps already ran today.
+    Called by N8N at 22:00. Deploys all deploy_ready stories, grouped by project.
+    Skips silently if nothing is queued.
     """
-    import json as _json  # noqa: PLC0415
-    from datetime import date  # noqa: PLC0415
-    from pathlib import Path  # noqa: PLC0415
+    from tools.run_tracker import get_deploy_ready_stories  # noqa: PLC0415
 
-    out_dir = Path("outputs/")
-    week = date.today().strftime("%Y-W%V")
-    safe_week = week.replace("-", "_")
+    by_project = get_deploy_ready_stories()
+    if not by_project:
+        return {"skipped": True, "reason": "no stories in deploy queue"}
 
-    qa_files = sorted(out_dir.glob(f"qa_*{safe_week}*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
-    if not qa_files:
-        return {"skipped": True, "reason": "no qa output for current week"}
-
-    try:
-        qa_data = _json.loads(qa_files[0].read_text(encoding="utf-8"))
-    except Exception:
-        return {"skipped": True, "reason": "could not read qa output"}
-
-    if not qa_data.get("human_approved"):
-        return {"skipped": True, "reason": "qa gate not approved yet"}
-
-    devops_files = list(out_dir.glob(f"devops_*{safe_week}*.json"))
-    if devops_files:
-        return {"skipped": True, "reason": "devops already ran this week"}
-
-    background_tasks.add_task(_run_in_thread, _do_expansao_pipeline, "", "devops")
-    return {"triggered": True, "starting_from": "devops", "week": week}
+    background_tasks.add_task(_run_in_thread, _do_deploy_queue, by_project)
+    summary = {p: len(s) for p, s in by_project.items()}
+    return {"triggered": True, "projects": summary}
 
 
 @app.post("/expansao/ceo")
@@ -334,6 +317,12 @@ def _do_expansao_pipeline(context: str, start_from: str) -> None:
 def _do_ceo(context: str) -> None:
     from orchestrator.agents.ceo_agent import CEOAgent  # noqa: PLC0415
     CEOAgent().run(extra_context=context)
+
+
+def _do_deploy_queue(by_project: dict) -> None:
+    """Execute deploys per project for all deploy_ready stories."""
+    from orchestrator.agents.devops_agent import DevOpsAgent  # noqa: PLC0415
+    DevOpsAgent().run_deploy_queue(by_project)
 
 
 def _do_deploy_aios() -> None:

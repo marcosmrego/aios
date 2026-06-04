@@ -387,6 +387,28 @@ def upsert_story(sprint: str, story_id: str, title: str = "", project: str = "",
         c.close()
 
 
+def get_deploy_ready_stories() -> dict[str, list[dict]]:
+    """Return deploy_ready stories grouped by project. Used by deploy queue at 22:00."""
+    c = _conn()
+    if not c:
+        return {}
+    try:
+        import psycopg2.extras  # noqa: PLC0415
+        with c.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT * FROM pipeline_stories WHERE status = 'deploy_ready' ORDER BY project, sprint, story_id"
+            )
+            rows = [dict(r) for r in cur.fetchall()]
+        by_project: dict[str, list[dict]] = {}
+        for r in rows:
+            by_project.setdefault(r["project"], []).append(r)
+        return by_project
+    except Exception:
+        return {}
+    finally:
+        c.close()
+
+
 def get_stories(sprint: str | None = None) -> list[dict]:
     c = _conn()
     if not c:

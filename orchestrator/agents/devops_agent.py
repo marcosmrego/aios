@@ -147,6 +147,59 @@ Inclua o JSON de output ao final da sua resposta.
         )
         return output
 
+    def run_deploy_queue(self, by_project: dict[str, list]) -> None:
+        """Deploy all queued stories grouped by project. Called by /deploy-queue/execute."""
+        from tools.run_tracker import upsert_story  # noqa: PLC0415
+        console.rule("[bold]DevOps Agent — Deploy Queue")
+
+        for project, stories in by_project.items():
+            console.print(f"[blue]Deploying {len(stories)} stories for project '{project}'...[/]")
+            uuids = self._project_coolify_uuids(project)
+            all_ok = True
+
+            if uuids:
+                try:
+                    from tools.coolify import CoolifyClient  # noqa: PLC0415
+                    coolify = CoolifyClient()
+                    for uuid in uuids:
+                        import httpx  # noqa: PLC0415
+                        headers = {
+                            "Authorization": f"Bearer {settings.coolify_api_key}",
+                            "Content-Type": "application/json",
+                        }
+                        base = settings.coolify_base_url.rstrip("/")
+                        r = httpx.post(f"{base}/api/v1/deploy?uuid={uuid}&force=false",
+                                       headers=headers, timeout=30)
+                        r.raise_for_status()
+                        console.print(f"[green]  Deploy triggered: {uuid[:12]}[/]")
+                        healthy = coolify.health_check_by_id(uuid)
+                        if not healthy:
+                            all_ok = False
+                            console.print(f"[red]  Health check failed: {uuid[:12]}[/]")
+                except Exception as exc:
+                    all_ok = False
+                    console.print(f"[red]Deploy error for {project}: {exc}[/]")
+            else:
+                console.print(f"[yellow]  No Coolify UUID configured for '{project}' — marking as deployed (manual confirm needed)[/]")
+
+            new_status = "deployed" if all_ok else "deploy_failed"
+            for story in stories:
+                try:
+                    upsert_story(sprint=story["sprint"], story_id=story["story_id"], status=new_status)
+                except Exception:
+                    pass
+            console.print(f"[{'green' if all_ok else 'red'}]{project}: {len(stories)} stories → {new_status}[/]")
+
+    def _project_coolify_uuids(self, project: str) -> list[str]:
+        mapping = {
+            "aios":     settings.coolify_uuid_aios,
+            "climate":  settings.coolify_uuid_climate,
+            "grc-flow": settings.coolify_uuid_grc_flow,
+            "cwi":      settings.coolify_uuid_cwi,
+        }
+        raw = mapping.get(project, "")
+        return [u.strip() for u in raw.split(",") if u.strip()]
+
     def _execute_deploys(self, output: dict[str, Any]) -> dict[str, Any]:
         """Trigger N8N deploy webhook for each planned deploy."""
         from tools.n8n import N8NClient  # noqa: PLC0415

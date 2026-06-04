@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     coolify_base_url: str = ""
     coolify_api_key: str = ""
 
+    # Coolify UUIDs por projeto (vírgula para múltiplos serviços)
+    coolify_uuid_aios: str = "nuq78y0fxb3toq3kdun7rb3u,soox30s56xbhg0794ncwgkj4"
+    coolify_uuid_climate: str = ""
+    coolify_uuid_grc_flow: str = ""
+    coolify_uuid_cwi: str = ""
+
     # N8N workflow IDs (pre-configured)
     n8n_deploy_webhook: str = "deploy"  # webhook path suffix
 

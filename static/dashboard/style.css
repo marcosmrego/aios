@@ -246,8 +246,9 @@ main { max-width: 1100px; margin: 0 auto; padding: 24px; display: flex; flex-dir
 /* Story action buttons */
 .story-action-btn { display: block; width: 100%; margin-top: 6px; padding: 4px 0; border: none; border-radius: 5px; font-size: .75rem; font-weight: 600; cursor: pointer; transition: opacity .15s; }
 .story-action-btn:hover { opacity: .85; }
-.story-action-btn.deploy { background: rgba(63,185,80,.18); color: var(--green); border: 1px solid rgba(63,185,80,.35); }
-.story-action-btn.dev    { background: rgba(88,166,255,.15); color: var(--blue);  border: 1px solid rgba(88,166,255,.3); }
+.story-action-btn.deploy { background: rgba(63,185,80,.18);  color: var(--green);  border: 1px solid rgba(63,185,80,.35); }
+.story-action-btn.dev    { background: rgba(88,166,255,.15); color: var(--blue);   border: 1px solid rgba(88,166,255,.3); }
+.story-action-btn.done   { background: rgba(188,140,255,.15);color: var(--purple); border: 1px solid rgba(188,140,255,.3); }
 
 .gates-section { padding: 0 24px 16px; }
 .gates-section h4 { font-size: .85rem; color: var(--muted); margin-bottom: 10px; }
