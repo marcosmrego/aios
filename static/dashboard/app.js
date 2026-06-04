@@ -552,7 +552,11 @@ function connectSSE() {
       loadStories();
       return;
     }
-    if (evt.type === 'run_update' || evt.type === 'stage_update' || evt.type === 'gate_decision' || evt.type === 'gate_pending') {
+    if (evt.type === 'gate_pending') {
+      loadPendingGates();
+      return;
+    }
+    if (evt.type === 'run_update' || evt.type === 'stage_update' || evt.type === 'gate_decision') {
       loadRuns();
       loadCosts();
       loadAgentsToday();
@@ -570,7 +574,7 @@ function switchTab(tab) {
     document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
     document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
   });
-  if (tab === 'stories') loadStories();
+  if (tab === 'stories') { loadStories(); loadPendingGates(); }
   if (tab === 'credits') loadCredits();
   if (tab === 'history') renderRuns();
   if (tab === 'runs')    renderKanban();
@@ -590,6 +594,37 @@ const STORY_COLS = [
 ];
 
 let _allStories = [];
+
+async function loadPendingGates() {
+  const project = document.getElementById('filter-story-project').value;
+  const url = project ? `/dashboard/gates/pending?project=${project}` : '/dashboard/gates/pending';
+  const gates = await apiFetch(url);
+  const bar = document.getElementById('stories-gates-bar');
+  if (!bar) return;
+  if (!gates || !gates.length) { bar.innerHTML = ''; return; }
+
+  const GATE_LABELS = {
+    'pm->architect':   '📋 PM → Architect — revisar PRDs antes de gerar arquitetura',
+    'qa->deploy':      '🔍 QA → Deploy — revisar resultado do QA',
+    'arch->dev':       '🏗 Architect → Dev — revisar arquitetura antes de gerar código',
+    'content->publish':'📣 Content → Publish — revisar conteúdo de marketing',
+  };
+
+  bar.innerHTML = gates.map(g => `
+    <div class="gate-banner">
+      <div class="gate-banner-info">
+        <span class="gate-banner-icon">🚦</span>
+        <div>
+          <div class="gate-banner-title">${GATE_LABELS[g.gate_id] || g.gate_id}</div>
+          <div class="gate-banner-sub">${g.project} · ${g.extra_context?.slice(0,60) || ''}</div>
+        </div>
+      </div>
+      <div class="gate-banner-actions">
+        <button class="btn-approve" onclick="decideGate('${g.run_id}','${g.gate_id}','approved');loadPendingGates()">✅ Aprovar</button>
+        <button class="btn-reject"  onclick="decideGate('${g.run_id}','${g.gate_id}','rejected');loadPendingGates()">❌ Rejeitar</button>
+      </div>
+    </div>`).join('');
+}
 
 async function loadStories() {
   // Load sprints into selector (once)
@@ -639,6 +674,7 @@ function updateEpicFilter(stories) {
 function onStoryFilterChange() {
   updateEpicFilter(_allStories);
   renderStoriesKanban(filterStories(_allStories));
+  loadPendingGates();
 }
 
 function renderStoriesKanban(stories) {

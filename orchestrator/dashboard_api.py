@@ -163,6 +163,40 @@ class StoryStatusUpdate(BaseModel):
     status: str  # "deploy_ready" | "dev" | "qa" | etc.
 
 
+@router.get("/gates/pending")
+def pending_gates(sprint: str | None = None, project: str | None = None,
+                  user: str = Depends(_auth)) -> list[dict]:
+    """Return pending gates relevant to a given sprint/project view."""
+    from tools.run_tracker import _conn  # noqa: PLC0415
+    c = _conn()
+    if not c:
+        return []
+    try:
+        import psycopg2.extras  # noqa: PLC0415
+        with c.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Find pending gates whose run matches the sprint/project context
+            query = """
+                SELECT gd.run_id, gd.gate_id, gd.decision,
+                       pr.project, pr.extra_context, pr.started_at
+                FROM gate_decisions gd
+                JOIN pipeline_runs pr ON pr.run_id = gd.run_id
+                WHERE gd.decision = 'pending'
+                  AND pr.status NOT IN ('completed', 'failed')
+            """
+            params: list = []
+            if project:
+                query += " AND pr.project = %s"
+                params.append(project)
+            query += " ORDER BY pr.started_at DESC"
+            cur.execute(query, params)
+            rows = [dict(r) for r in cur.fetchall()]
+        return _serialize(rows)
+    except Exception:
+        return []
+    finally:
+        c.close()
+
+
 @router.post("/stories/{sprint}/{story_id}/status")
 async def update_story_status(sprint: str, story_id: str, body: StoryStatusUpdate,
                                user: str = Depends(_auth)) -> dict:

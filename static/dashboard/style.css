@@ -243,6 +243,14 @@ main { max-width: 1100px; margin: 0 auto; padding: 24px; display: flex; flex-dir
 .kanban-tokens { font-size: .65rem; color: var(--muted); }
 
 /* Gates */
+/* Pending gate banner in stories view */
+.gate-banner { display:flex; align-items:center; justify-content:space-between; background:rgba(210,153,34,.1); border:1px solid rgba(210,153,34,.35); border-radius:8px; padding:10px 16px; margin-bottom:8px; gap:16px; }
+.gate-banner-info { display:flex; align-items:center; gap:12px; }
+.gate-banner-icon { font-size:1.2rem; }
+.gate-banner-title { font-size:.85rem; font-weight:600; color:var(--yellow); }
+.gate-banner-sub { font-size:.75rem; color:var(--muted); margin-top:2px; }
+.gate-banner-actions { display:flex; gap:8px; flex-shrink:0; }
+
 /* Story action buttons */
 .story-action-btn { display: block; width: 100%; margin-top: 6px; padding: 4px 0; border: none; border-radius: 5px; font-size: .75rem; font-weight: 600; cursor: pointer; transition: opacity .15s; }
 .story-action-btn:hover { opacity: .85; }
