@@ -752,7 +752,6 @@ function storyCard(s) {
 
   const epicBadge  = s.epic_id  ? `<div class="kb-card-sprint">${s.epic_id}</div>` : '';
   const filesBadge = s.dev_files > 0 ? `<span class="kb-card-stories">${s.dev_files} arq.</span>` : '';
-  const qaNote     = s.qa_notes ? `<div class="kb-card-blocker">${s.qa_notes.slice(0,55)}${s.qa_notes.length > 55 ? '…' : ''}</div>` : '';
 
   return `
     <div class="kb-card ${statusCls}" data-story-id="${s.story_id}">
@@ -760,7 +759,6 @@ function storyCard(s) {
       <div class="kb-card-title">${s.story_id} — ${s.title.slice(0,38)}${s.title.length > 38 ? '…' : ''}</div>
       <div class="kb-card-meta">${filesBadge}</div>
       <span class="kb-card-status ${statusCls}">${s.status.replace('_',' ')}</span>
-      ${qaNote}
     </div>`;
 }
 
