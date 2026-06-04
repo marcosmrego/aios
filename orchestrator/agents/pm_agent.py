@@ -36,7 +36,7 @@ class PMAgent(BaseAgent):
         if spec_data:
             # Input from approved Spec (Watcher flow)
             from datetime import date  # noqa: PLC0415
-            sprint = date.today().strftime("%Y-W%W")
+            sprint = date.today().strftime("%Y-W%V")  # ISO week, same as standard pipeline
             spec_json = json.dumps(spec_data, ensure_ascii=False, indent=2)
             user_message = f"""
 ## Especificacao Funcional Aprovada

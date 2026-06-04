@@ -139,7 +139,7 @@ Se o backlog item não tiver stories ainda, aí sim você pode propô-las — ma
       "backlog_item_id": "string",
       "stories": [
         {
-          "id": "US-001",
+          "id": "PROJ-US-001 (prefixe com projeto: GRC-US-001, CLIMA-US-001, AIOS-US-001)",
           "title": "string",
           "project": "climate|aios|grc-flow|expansao|cwi",
           "as_a": "string",
