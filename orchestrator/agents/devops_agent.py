@@ -42,10 +42,34 @@ class DevOpsAgent(BaseAgent):
             return {"sprint": qa_output.get("sprint"), "deploys": [], "aborted": True}
 
         sprint = qa_output.get("sprint") or dev_output.get("sprint") or architect_output.get("sprint", "unknown")
-        qa_json = json.dumps(qa_output, ensure_ascii=False, indent=2)
-        implementations_json = json.dumps(
-            dev_output.get("implementations", []), ensure_ascii=False, indent=2
-        )
+
+        # Strip file content from implementations — DevOps only needs metadata
+        impl_summary = [
+            {
+                "story_id": i.get("story_id"),
+                "title":    i.get("title", ""),
+                "files_created": i.get("files_created", []),
+                "notes":    i.get("notes", ""),
+            }
+            for i in dev_output.get("implementations", [])
+        ]
+        # Strip report bodies from QA — only pass verdict per story
+        qa_summary = {
+            "sprint":         qa_output.get("sprint"),
+            "approved":       qa_output.get("approved"),
+            "human_approved": qa_output.get("human_approved"),
+            "overall_notes":  qa_output.get("overall_notes"),
+            "stories": [
+                {
+                    "story_id":       r.get("story_id"),
+                    "recommendation": r.get("recommendation"),
+                }
+                for r in qa_output.get("reports", [])
+            ],
+        }
+
+        qa_json = json.dumps(qa_summary, ensure_ascii=False, indent=2)
+        implementations_json = json.dumps(impl_summary, ensure_ascii=False, indent=2)
         stack_json = json.dumps(
             [a.get("stack_decisions", {}) for a in architect_output.get("architectures", [])],
             ensure_ascii=False,
@@ -97,9 +121,12 @@ Inclua o JSON de output ao final da sua resposta.
         filename = f"devops_{safe_sprint}.json"
         self._save_output(output, filename)
 
-        # Persist each deploy record to Notion
+        # Persist each deploy record to Notion (non-fatal)
         for deploy in output.get("deploys", []):
-            self.notion.create_deploy_page(sprint, deploy)
+            try:
+                self.notion.create_deploy_page(sprint, deploy)
+            except Exception as exc:
+                console.print(f"[yellow]Notion deploy persist skipped: {exc}[/]")
 
         # Slack notification
         success_count = sum(1 for d in output.get("deploys", []) if d.get("status") == "success")
