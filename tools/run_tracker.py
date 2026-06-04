@@ -31,6 +31,9 @@ DO $$ BEGIN
         ALTER TABLE pipeline_stories ADD COLUMN epic_id VARCHAR(50) DEFAULT '';
         ALTER TABLE pipeline_stories ADD COLUMN epic_title TEXT DEFAULT '';
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='pipeline_stories' AND column_name='notion_id') THEN
+        ALTER TABLE pipeline_stories ADD COLUMN notion_id TEXT DEFAULT '';
+    END IF;
 END $$;
 """
 
@@ -346,7 +349,7 @@ def get_run_detail(run_id: str) -> dict | None:
 def upsert_story(sprint: str, story_id: str, title: str = "", project: str = "",
                  epic_id: str = "", epic_title: str = "", prd_title: str = "",
                  status: str = "backlog", dev_files: int = 0,
-                 qa_result: str = "", qa_notes: str = "") -> None:
+                 qa_result: str = "", qa_notes: str = "", notion_id: str = "") -> None:
     c = _conn()
     if not c:
         return
@@ -359,8 +362,8 @@ def upsert_story(sprint: str, story_id: str, title: str = "", project: str = "",
             cur.execute("""
                 INSERT INTO pipeline_stories
                     (sprint, story_id, title, project, epic_id, epic_title, prd_title,
-                     status, dev_files, qa_result, qa_notes, updated_at)
-                VALUES (%s, %s, %s, COALESCE(NULLIF(%s,''),'expansao'), %s, %s, %s, %s, %s, %s, %s, NOW())
+                     status, dev_files, qa_result, qa_notes, notion_id, updated_at)
+                VALUES (%s, %s, %s, COALESCE(NULLIF(%s,''),'expansao'), %s, %s, %s, %s, %s, %s, %s, %s, NOW())
                 ON CONFLICT (sprint, story_id) DO UPDATE SET
                     title       = CASE WHEN EXCLUDED.title      != '' THEN EXCLUDED.title      ELSE pipeline_stories.title END,
                     project     = CASE WHEN %s                  != '' THEN %s                  ELSE pipeline_stories.project END,
@@ -371,9 +374,10 @@ def upsert_story(sprint: str, story_id: str, title: str = "", project: str = "",
                     dev_files   = CASE WHEN EXCLUDED.dev_files  != 0   THEN EXCLUDED.dev_files  ELSE pipeline_stories.dev_files END,
                     qa_result   = CASE WHEN EXCLUDED.qa_result  != '' THEN EXCLUDED.qa_result  ELSE pipeline_stories.qa_result END,
                     qa_notes    = CASE WHEN EXCLUDED.qa_notes   != '' THEN EXCLUDED.qa_notes   ELSE pipeline_stories.qa_notes END,
+                    notion_id   = CASE WHEN EXCLUDED.notion_id  != '' THEN EXCLUDED.notion_id  ELSE pipeline_stories.notion_id END,
                     updated_at  = NOW()
             """, (sprint, story_id, title, project, epic_id, epic_title, prd_title,
-                  status, dev_files, qa_result, qa_notes,
+                  status, dev_files, qa_result, qa_notes, notion_id,
                   project, project))
         c.commit()
         try:
@@ -385,6 +389,68 @@ def upsert_story(sprint: str, story_id: str, title: str = "", project: str = "",
         c.rollback()
     finally:
         c.close()
+
+
+def get_epic_notion_id(sprint: str, epic_id: str) -> str:
+    """Return the Notion backlog page ID for an epic, or '' if not stored."""
+    c = _conn()
+    if not c:
+        return ""
+    try:
+        with c.cursor() as cur:
+            cur.execute(
+                "SELECT notion_id FROM pipeline_stories WHERE sprint=%s AND epic_id=%s AND notion_id != '' LIMIT 1",
+                (sprint, epic_id),
+            )
+            row = cur.fetchone()
+        return row[0] if row else ""
+    except Exception:
+        return ""
+    finally:
+        c.close()
+
+
+def get_epic_aggregate_notion_status(sprint: str, epic_id: str) -> str:
+    """Compute the Notion status for a backlog item based on all its stories."""
+    c = _conn()
+    if not c:
+        return ""
+    try:
+        with c.cursor() as cur:
+            cur.execute(
+                "SELECT status FROM pipeline_stories WHERE sprint=%s AND epic_id=%s",
+                (sprint, epic_id),
+            )
+            statuses = {r[0] for r in cur.fetchall()}
+        if not statuses:
+            return ""
+        if statuses <= {"done"}:
+            return "Done"
+        if any(s in statuses for s in ("dev", "qa_rejected", "backlog", "qa")):
+            return "In Progress"
+        if statuses <= {"qa_approved", "deploy_ready", "deployed", "done"}:
+            return "In Review"
+        return "In Progress"
+    except Exception:
+        return ""
+    finally:
+        c.close()
+
+
+def sync_epic_notion_status(sprint: str, epic_id: str) -> None:
+    """Update Notion backlog item status based on aggregate story statuses."""
+    notion_id = get_epic_notion_id(sprint, epic_id)
+    if not notion_id:
+        return
+    notion_status = get_epic_aggregate_notion_status(sprint, epic_id)
+    if not notion_status:
+        return
+    try:
+        from tools.notion import NotionClient  # noqa: PLC0415
+        notion = NotionClient()
+        notion._patch(f"/pages/{notion_id}", {"properties": {"Status": {"select": {"name": notion_status}}}})
+    except Exception:
+        pass
 
 
 def get_deploy_ready_stories() -> dict[str, list[dict]]:

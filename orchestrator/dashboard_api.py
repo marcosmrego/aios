@@ -172,6 +172,16 @@ async def update_story_status(sprint: str, story_id: str, body: StoryStatusUpdat
         raise HTTPException(status_code=400, detail=f"status inválido: {body.status}")
     upsert_story(sprint=sprint, story_id=story_id, status=body.status)
     await broadcast({"type": "story_update", "sprint": sprint, "story_id": story_id, "status": body.status})
+    # Sync Notion backlog item status based on aggregate story statuses
+    try:
+        from tools.run_tracker import sync_epic_notion_status, get_stories  # noqa: PLC0415
+        stories = get_stories(sprint=sprint)
+        epic_id = next((s.get("epic_id", "") for s in stories if s.get("story_id") == story_id), "")
+        if epic_id:
+            import asyncio  # noqa: PLC0415
+            asyncio.get_event_loop().run_in_executor(None, sync_epic_notion_status, sprint, epic_id)
+    except Exception:
+        pass
     return {"ok": True, "sprint": sprint, "story_id": story_id, "status": body.status}
 
 

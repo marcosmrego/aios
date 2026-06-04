@@ -101,6 +101,7 @@ Inclua o JSON de output ao final da sua resposta.
             prd_project  = prd.get("project", "expansao")
             epic_id      = prd.get("epic_id", "")
             epic_title   = prd.get("title", "")
+            prd_notion_id = prd.get("notion_id", "")
             for story in prd.get("stories", []):
                 sid = story.get("id", "")
                 if sid:
@@ -111,6 +112,7 @@ Inclua o JSON de output ao final da sua resposta.
                             project=story.get("project", prd_project),
                             epic_id=epic_id, epic_title=epic_title,
                             prd_title=epic_title, status="backlog",
+                            notion_id=prd_notion_id,
                         )
                     except Exception:
                         pass
