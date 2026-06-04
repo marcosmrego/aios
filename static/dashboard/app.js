@@ -28,7 +28,7 @@ async function apiFetch(path, opts = {}) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   _initTooltip();
-  await Promise.all([loadCosts(), loadRuns(), loadAgentsToday()]);
+  await Promise.all([loadCosts(), loadRuns()]);
   loadStories();
   connectSSE();
 }
@@ -556,7 +556,7 @@ function connectSSE() {
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
-const TABS = ['stories', 'runs', 'history', 'credits'];
+const TABS = ['stories', 'runs', 'history', 'agents', 'credits'];
 
 function switchTab(tab) {
   TABS.forEach(t => {
@@ -567,6 +567,7 @@ function switchTab(tab) {
   if (tab === 'credits') loadCredits();
   if (tab === 'history') renderRuns();
   if (tab === 'runs')    renderKanban();
+  if (tab === 'agents')  loadAgentsToday();
 }
 
 // ── Stories kanban ────────────────────────────────────────────────────────────

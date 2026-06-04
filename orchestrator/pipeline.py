@@ -160,7 +160,7 @@ def run_pipeline(extra_context: str = "", start_from: str = "ceo", force: bool =
             return
 
         # Deploy queue mode: enqueue stories and wait for 22:00 trigger
-        if settings.deploy_queue_mode and "devops" not in active_stages[1:]:
+        if settings.deploy_queue_mode and "qa" in active_stages:
             qa_sprint = qa_output.get("sprint", "")
             if qa_sprint:
                 from tools.run_tracker import upsert_story  # noqa: PLC0415

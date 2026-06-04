@@ -509,6 +509,7 @@ def get_cost_summary() -> dict:
     try:
         import psycopg2.extras  # noqa: PLC0415
         with c.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # pipeline_runs costs (accumulated via complete_stage)
             cur.execute("""
                 SELECT
                     COALESCE(SUM(cost_usd) FILTER (WHERE started_at >= NOW() - INTERVAL '1 day'), 0) AS today,
@@ -518,6 +519,18 @@ def get_cost_summary() -> dict:
                 FROM pipeline_runs
             """)
             totals = dict(cur.fetchone())
+            # agent_runs costs (per-call tracking — includes runs killed before complete_stage)
+            cur.execute("""
+                SELECT
+                    COALESCE(SUM(cost_usd) FILTER (WHERE run_at >= NOW() - INTERVAL '1 day'), 0) AS today,
+                    COALESCE(SUM(cost_usd) FILTER (WHERE run_at >= NOW() - INTERVAL '7 days'), 0) AS week,
+                    COALESCE(SUM(cost_usd) FILTER (WHERE run_at >= NOW() - INTERVAL '30 days'), 0) AS month,
+                    COALESCE(SUM(cost_usd), 0) AS total
+                FROM agent_runs
+            """)
+            agent_totals = dict(cur.fetchone())
+            for key in ("today", "week", "month", "total"):
+                totals[key] = float(totals[key]) + float(agent_totals[key])
             cur.execute("""
                 SELECT project, pipeline,
                        COUNT(*) AS runs,

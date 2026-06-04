@@ -39,14 +39,13 @@
   </div>
 </div>
 
-<div class="agents-today-bar" id="agents-today-bar"></div>
-
 <main>
 <!-- Tabs -->
 <div class="tabs">
   <button class="tab active" id="tab-stories"  onclick="switchTab('stories')">📋 User Stories</button>
   <button class="tab"        id="tab-runs"      onclick="switchTab('runs')">⚙ Execuções</button>
   <button class="tab"        id="tab-history"   onclick="switchTab('history')">🕐 Histórico</button>
+  <button class="tab"        id="tab-agents"    onclick="switchTab('agents')">🤖 Agentes</button>
   <button class="tab"        id="tab-credits"   onclick="switchTab('credits')">💳 Saldo</button>
 </div>
 
@@ -103,7 +102,16 @@
   </div>
 </div>
 
-<!-- ── Aba 4: Saldo ──────────────────────────────────────────────── -->
+<!-- ── Aba 4: Agentes ────────────────────────────────────────────── -->
+<div id="panel-agents" class="hidden">
+  <div class="section-header" style="margin-top:14px">
+    <h2 style="font-size:.9rem">🤖 Agentes</h2>
+    <button class="btn-ghost" onclick="loadAgentsToday()">↻ Atualizar</button>
+  </div>
+  <div id="agents-today-bar"></div>
+</div>
+
+<!-- ── Aba 5: Saldo ──────────────────────────────────────────────── -->
 <div id="panel-credits" class="hidden">
   <div class="section-header" style="margin-top:14px">
     <h2 style="font-size:.9rem">⚡ Saldo Anthropic</h2>
