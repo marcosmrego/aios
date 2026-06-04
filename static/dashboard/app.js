@@ -545,8 +545,12 @@ function connectSSE() {
   const es = new EventSource(`/dashboard/stream?token=${token}`);
   es.onmessage = (e) => {
     const evt = JSON.parse(e.data);
+    if (evt.type === 'story_update') {
+      loadStories();
+      return;
+    }
     if (evt.type === 'run_update' || evt.type === 'stage_update' || evt.type === 'gate_decision' || evt.type === 'gate_pending') {
-      loadRuns();  // also calls renderKanban()
+      loadRuns();
       loadCosts();
       loadAgentsToday();
       if (currentRunId === evt.run_id) openRun(evt.run_id);

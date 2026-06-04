@@ -371,6 +371,11 @@ def upsert_story(sprint: str, story_id: str, title: str = "", project: str = "ex
             """, (sprint, story_id, title, project, epic_id, epic_title, prd_title,
                   status, dev_files, qa_result, qa_notes))
         c.commit()
+        try:
+            from orchestrator.dashboard_api import emit_event  # noqa: PLC0415
+            emit_event({"type": "story_update", "sprint": sprint, "story_id": story_id, "status": status})
+        except Exception:
+            pass
     except Exception:
         c.rollback()
     finally:
