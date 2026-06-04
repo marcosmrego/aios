@@ -104,6 +104,7 @@ Você receberá como contexto:
     {
       "title": "string",
       "notion_id": "string",
+      "project": "climate|aios|grc-flow|expansao|cwi",
       "business_justification": "string",
       "estimated_effort": "P (pontos de story)",
       "assigned_to_pm": true

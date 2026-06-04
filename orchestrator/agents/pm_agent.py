@@ -94,9 +94,26 @@ Inclua o JSON de output ao final da sua resposta.
         filename = f"pm_prds_{safe_sprint}.json"
         self._save_output(output, filename)
 
-        # Save each PRD to Notion
+        # Save each PRD to Notion + register stories in dashboard DB
+        from tools.run_tracker import upsert_story  # noqa: PLC0415
         for prd in output.get("prds", []):
             self.notion.create_prd_page(sprint, prd)
+            prd_project  = prd.get("project", "expansao")
+            epic_id      = prd.get("epic_id", "")
+            epic_title   = prd.get("title", "")
+            for story in prd.get("stories", []):
+                sid = story.get("id", "")
+                if sid:
+                    try:
+                        upsert_story(
+                            sprint=sprint, story_id=sid,
+                            title=story.get("title", ""),
+                            project=story.get("project", prd_project),
+                            epic_id=epic_id, epic_title=epic_title,
+                            prd_title=epic_title, status="backlog",
+                        )
+                    except Exception:
+                        pass
 
         # Notify Slack
         if settings.slack_webhook_url_expansao and output.get("slack_summary"):
