@@ -29,7 +29,7 @@ async function apiFetch(path, opts = {}) {
 async function init() {
   _initTooltip();
   await Promise.all([loadCosts(), loadRuns()]);
-  loadStories();
+  loadBacklog();
   connectSSE();
 }
 
@@ -119,6 +119,132 @@ function fmtK(n) {
   if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
   if (n >= 1000) return (n/1000).toFixed(0) + 'k';
   return n;
+}
+
+// ── Dropdown ──────────────────────────────────────────────────────────────────
+function toggleDropdown(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle('hidden');
+  // Close on outside click
+  setTimeout(() => {
+    const handler = (e) => {
+      if (!el.contains(e.target) && !e.target.closest('.dropdown')) {
+        el.classList.add('hidden');
+        document.removeEventListener('click', handler);
+      }
+    };
+    document.addEventListener('click', handler);
+  }, 10);
+}
+
+// ── Novo Run ──────────────────────────────────────────────────────────────────
+async function triggerRun() {
+  const project   = document.getElementById('new-run-project').value;
+  const startFrom = document.getElementById('new-run-start-from').value;
+  const context   = document.getElementById('new-run-context').value;
+  document.getElementById('run-dropdown').classList.add('hidden');
+  await apiFetch('/dashboard/runs/trigger', {
+    method: 'POST',
+    body: JSON.stringify({ project, start_from: startFrom, context }),
+  });
+  switchTab('pipeline');
+  switchSubTab('runs');
+}
+
+// ── Spec upload ───────────────────────────────────────────────────────────────
+function openSpecModal() { document.getElementById('spec-modal-overlay').classList.remove('hidden'); }
+function closeSpecModal(e) {
+  if (!e || e.target.id === 'spec-modal-overlay') {
+    document.getElementById('spec-modal-overlay').classList.add('hidden');
+    document.getElementById('spec-status').textContent = '';
+  }
+}
+
+async function uploadSpec() {
+  const file    = document.getElementById('spec-file-input').files[0];
+  const project = document.getElementById('spec-project').value;
+  const context = document.getElementById('spec-context-input').value;
+  const status  = document.getElementById('spec-status');
+  if (!file) { status.textContent = 'Selecione um arquivo.'; return; }
+  status.textContent = 'Enviando…';
+  const form = new FormData();
+  form.append('file', file);
+  form.append('project', project);
+  form.append('context', context);
+  try {
+    const res = await fetch('/dashboard/spec/upload', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: form,
+    });
+    if (!res.ok) throw new Error(await res.text());
+    status.textContent = '✅ Pipeline iniciado! Acompanhe em Pipeline → Execuções.';
+    setTimeout(() => { closeSpecModal(); switchTab('pipeline'); switchSubTab('runs'); }, 1500);
+  } catch (e) {
+    status.textContent = `Erro: ${e.message}`;
+  }
+}
+
+// ── Backlog ───────────────────────────────────────────────────────────────────
+async function loadBacklog() {
+  const project = document.getElementById('backlog-filter-project')?.value || '';
+  const url = project ? `/dashboard/backlog?project=${project}` : '/dashboard/backlog';
+  const el = document.getElementById('backlog-list');
+  if (el) el.innerHTML = '<p class="empty-state">Carregando...</p>';
+  const items = await apiFetch(url);
+  renderBacklog(items || []);
+}
+
+const PROJ_LABEL = { climate: '🌦 Climate', 'grc-flow': '📋 GRC Flow', aios: '⚡ AIOS',
+                     'Expansao AIOS': '⚡ AIOS', 'GRC Flow': '📋 GRC Flow', Climate: '🌦 Climate' };
+
+function renderBacklog(items) {
+  const el = document.getElementById('backlog-list');
+  if (!el) return;
+  if (!items.length) { el.innerHTML = '<p class="empty-state">Nenhum item no backlog.</p>'; return; }
+
+  // Group by project
+  const groups = {};
+  items.forEach(i => {
+    const key = i.project || 'Outros';
+    groups[key] = groups[key] || [];
+    groups[key].push(i);
+  });
+
+  const nextSprint = new Date().toISOString().slice(0,4) + '-W' + String(getISOWeek(new Date()) + 1).padStart(2,'0');
+
+  el.innerHTML = Object.entries(groups).map(([proj, itens]) => `
+    <div class="backlog-project-group">
+      <div class="backlog-project-title">${PROJ_LABEL[proj] || proj}</div>
+      ${itens.map(i => `
+        <div class="backlog-item">
+          <div class="backlog-item-left">
+            <div class="backlog-item-title">${i.title}</div>
+            ${i.description ? `<div class="backlog-item-desc">${i.description.slice(0,80)}${i.description.length>80?'…':''}</div>` : ''}
+          </div>
+          <div class="backlog-item-right">
+            ${i.priority ? `<span class="priority-badge priority-${i.priority}">${i.priority}</span>` : ''}
+            <span class="status-badge ${i.status}">${i.status || '—'}</span>
+            ${i.status !== 'Done' ? `<button class="btn-sprint" onclick="markForSprint('${i.notion_id}','${nextSprint}')">+ Sprint ${nextSprint}</button>` : ''}
+          </div>
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+async function markForSprint(notionId, sprint) {
+  await apiFetch(`/dashboard/backlog/${notionId}/sprint`, {
+    method: 'POST',
+    body: JSON.stringify({ sprint }),
+  });
+  loadBacklog();
+}
+
+function getISOWeek(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 }
 
 // ── Costs ─────────────────────────────────────────────────────────────────────
@@ -580,18 +706,32 @@ function connectSSE() {
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
-const TABS = ['stories', 'runs', 'history', 'agents', 'credits'];
+const TABS = ['planning', 'stories', 'pipeline', 'credits'];
+const SUB_TABS = ['runs', 'history', 'agents'];
 
 function switchTab(tab) {
   TABS.forEach(t => {
-    document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
-    document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+    const p = document.getElementById(`panel-${t}`);
+    const b = document.getElementById(`tab-${t}`);
+    if (p) p.classList.toggle('hidden', t !== tab);
+    if (b) b.classList.toggle('active', t === tab);
   });
-  if (tab === 'stories') { loadStories(); loadPendingGates(); }
-  if (tab === 'credits') loadCredits();
-  if (tab === 'history') renderRuns();
-  if (tab === 'runs')    renderKanban();
-  if (tab === 'agents')  loadAgentsToday();
+  if (tab === 'planning')  loadBacklog();
+  if (tab === 'stories')   { loadStories(); loadPendingGates(); }
+  if (tab === 'pipeline')  renderKanban();
+  if (tab === 'credits')   loadCredits();
+}
+
+function switchSubTab(sub) {
+  SUB_TABS.forEach(s => {
+    const p = document.getElementById(`subpanel-${s}`);
+    const b = document.getElementById(`subtab-${s}`);
+    if (p) p.classList.toggle('hidden', s !== sub);
+    if (b) b.classList.toggle('active', s === sub);
+  });
+  if (sub === 'history') renderRuns();
+  if (sub === 'agents')  loadAgentsToday();
+  if (sub === 'runs')    renderKanban();
 }
 
 // ── Stories kanban ────────────────────────────────────────────────────────────

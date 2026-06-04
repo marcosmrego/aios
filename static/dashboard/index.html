@@ -7,50 +7,80 @@
 <link rel="stylesheet" href="/static/dashboard/style.css">
 </head>
 <body>
-<!-- Header -->
+
+<!-- ── Header ──────────────────────────────────────────────────── -->
 <header>
   <div class="header-left">
     <span class="logo">⚡ AIOS</span>
     <span class="subtitle">Expansão AI OS</span>
   </div>
+  <div class="header-center">
+    <div class="cost-pill">Hoje <strong id="cost-today">—</strong></div>
+    <div class="cost-pill">Semana <strong id="cost-week">—</strong></div>
+    <div class="cost-pill">Mês <strong id="cost-month">—</strong></div>
+    <div class="cost-pill accent">Saldo <strong id="cost-total">—</strong></div>
+  </div>
   <div class="header-right">
+    <div class="header-actions">
+      <div class="dropdown">
+        <button class="btn-primary" onclick="toggleDropdown('run-dropdown')">▶ Novo Run ▾</button>
+        <div class="dropdown-menu hidden" id="run-dropdown">
+          <div class="dropdown-label">Projeto</div>
+          <select id="new-run-project">
+            <option value="climate">🌦 Climate</option>
+            <option value="grc-flow">📋 GRC Flow</option>
+            <option value="aios">⚡ AIOS</option>
+            <option value="cwi">🏢 CWI</option>
+            <option value="expansao">🚀 Expansão AI</option>
+          </select>
+          <div class="dropdown-label">A partir de</div>
+          <select id="new-run-start-from">
+            <option value="ceo">CEO (início completo)</option>
+            <option value="pm">PM Agent</option>
+            <option value="dev">Dev Agent</option>
+            <option value="qa">QA Agent</option>
+            <option value="devops">DevOps (deploy)</option>
+          </select>
+          <div class="dropdown-label">Contexto (opcional)</div>
+          <input type="text" id="new-run-context" placeholder="Ex: foco em CLIMA-043">
+          <button class="btn-save" style="margin-top:8px;width:100%" onclick="triggerRun()">▶ Iniciar Pipeline</button>
+        </div>
+      </div>
+      <button class="btn-ghost" onclick="openSpecModal()">+ Spec</button>
+    </div>
     <span id="user-label" class="user-label"></span>
     <button class="btn-ghost" onclick="logout()">Sair</button>
   </div>
 </header>
 
-<!-- Cost bar (sempre visível) -->
-<div class="cost-bar-global">
-  <div class="cost-card">
-    <div class="cost-label">Hoje</div>
-    <div class="cost-value" id="cost-today">—</div>
-  </div>
-  <div class="cost-card">
-    <div class="cost-label">Esta semana</div>
-    <div class="cost-value" id="cost-week">—</div>
-  </div>
-  <div class="cost-card">
-    <div class="cost-label">Este mês</div>
-    <div class="cost-value" id="cost-month">—</div>
-  </div>
-  <div class="cost-card accent">
-    <div class="cost-label">Total acumulado</div>
-    <div class="cost-value" id="cost-total">—</div>
-  </div>
-</div>
-
 <main>
 <!-- Tabs -->
 <div class="tabs">
-  <button class="tab active" id="tab-stories"  onclick="switchTab('stories')">📋 User Stories</button>
-  <button class="tab"        id="tab-runs"      onclick="switchTab('runs')">⚙ Execuções</button>
-  <button class="tab"        id="tab-history"   onclick="switchTab('history')">🕐 Histórico</button>
-  <button class="tab"        id="tab-agents"    onclick="switchTab('agents')">🤖 Agentes</button>
+  <button class="tab active" id="tab-planning"  onclick="switchTab('planning')">📦 Planejamento</button>
+  <button class="tab"        id="tab-stories"   onclick="switchTab('stories')">📋 User Stories</button>
+  <button class="tab"        id="tab-pipeline"  onclick="switchTab('pipeline')">⚙ Pipeline</button>
   <button class="tab"        id="tab-credits"   onclick="switchTab('credits')">💳 Saldo</button>
 </div>
 
-<!-- ── Aba 1: User Stories ───────────────────────────────────────── -->
-<div id="panel-stories">
+<!-- ── Aba 1: Planejamento ────────────────────────────────────── -->
+<div id="panel-planning">
+  <div class="section-header" style="margin-top:14px">
+    <h2 style="font-size:.9rem">Backlog — itens priorizados por projeto</h2>
+    <div style="display:flex;gap:10px;align-items:center">
+      <select id="backlog-filter-project" onchange="loadBacklog()">
+        <option value="">Todos os projetos</option>
+        <option value="climate">🌦 Climate</option>
+        <option value="grc-flow">📋 GRC Flow</option>
+        <option value="aios">⚡ AIOS</option>
+      </select>
+      <button class="btn-ghost" onclick="loadBacklog()">↻ Atualizar</button>
+    </div>
+  </div>
+  <div id="backlog-list"><p class="empty-state">Carregando backlog do Notion...</p></div>
+</div>
+
+<!-- ── Aba 2: User Stories ────────────────────────────────────── -->
+<div id="panel-stories" class="hidden">
   <div class="stories-filters">
     <select id="filter-story-project" onchange="onStoryFilterChange()">
       <option value="">Todos os projetos</option>
@@ -70,13 +100,40 @@
   <div class="kanban-board" id="stories-board"></div>
 </div>
 
-<!-- ── Aba 2: Execuções (kanban de runs) ────────────────────────── -->
-<div id="panel-runs" class="hidden">
-  <div class="section-header" style="margin-top:14px">
-    <span style="color:var(--muted);font-size:.85rem">Cada card = uma execução do pipeline</span>
-    <div style="display:flex;gap:10px;align-items:center">
-      <span class="dot-live"></span>
-      <select id="kanban-filter-project" onchange="renderKanban()">
+<!-- ── Aba 3: Pipeline ────────────────────────────────────────── -->
+<div id="panel-pipeline" class="hidden">
+  <div class="sub-tabs">
+    <button class="sub-tab active" id="subtab-runs"     onclick="switchSubTab('runs')">⚙ Execuções</button>
+    <button class="sub-tab"        id="subtab-history"  onclick="switchSubTab('history')">🕐 Histórico</button>
+    <button class="sub-tab"        id="subtab-agents"   onclick="switchSubTab('agents')">🤖 Agentes</button>
+  </div>
+
+  <!-- Sub: Execuções -->
+  <div id="subpanel-runs">
+    <div class="section-header" style="margin-top:10px">
+      <span style="color:var(--muted);font-size:.85rem;display:flex;align-items:center;gap:6px"><span class="dot-live"></span>Execuções em tempo real</span>
+      <div style="display:flex;gap:10px">
+        <select id="kanban-filter-project" onchange="renderKanban()">
+          <option value="">Todos os projetos</option>
+          <option value="climate">🌦 Climate</option>
+          <option value="grc-flow">📋 GRC Flow</option>
+          <option value="aios">⚡ AIOS</option>
+          <option value="cwi">🏢 CWI</option>
+          <option value="expansao">🚀 Expansão AI</option>
+        </select>
+        <select id="kanban-filter-sprint" onchange="renderKanban()">
+          <option value="">Todos os sprints</option>
+        </select>
+      </div>
+    </div>
+    <div class="kanban-board" id="kanban-board"></div>
+  </div>
+
+  <!-- Sub: Histórico -->
+  <div id="subpanel-history" class="hidden">
+    <div class="section-header" style="margin-top:10px">
+      <h2 style="font-size:.9rem">Histórico de execuções</h2>
+      <select id="filter-project" onchange="renderRuns()">
         <option value="">Todos os projetos</option>
         <option value="climate">🌦 Climate</option>
         <option value="grc-flow">📋 GRC Flow</option>
@@ -84,48 +141,26 @@
         <option value="cwi">🏢 CWI</option>
         <option value="expansao">🚀 Expansão AI</option>
       </select>
-      <select id="kanban-filter-sprint" onchange="renderKanban()">
-        <option value="">Todos os sprints</option>
-      </select>
     </div>
+    <div id="runs-list" class="runs-list"><p class="empty-state">Carregando...</p></div>
   </div>
-  <div class="kanban-board" id="kanban-board"></div>
-</div>
 
-<!-- ── Aba 3: Histórico ──────────────────────────────────────────── -->
-<div id="panel-history" class="hidden">
-  <div class="section-header" style="margin-top:14px">
-    <h2 style="font-size:.9rem">Histórico de execuções</h2>
-    <select id="filter-project" onchange="renderRuns()">
-      <option value="">Todos os projetos</option>
-      <option value="climate">🌦 Climate</option>
-      <option value="grc-flow">📋 GRC Flow</option>
-      <option value="aios">⚡ AIOS</option>
-      <option value="cwi">🏢 CWI</option>
-      <option value="expansao">🚀 Expansão AI</option>
-    </select>
-  </div>
-  <div id="runs-list" class="runs-list">
-    <p class="empty-state">Carregando...</p>
+  <!-- Sub: Agentes -->
+  <div id="subpanel-agents" class="hidden">
+    <div class="section-header" style="margin-top:10px">
+      <h2 style="font-size:.9rem">🤖 Agentes</h2>
+      <button class="btn-ghost" onclick="loadAgentsToday()">↻ Atualizar</button>
+    </div>
+    <div id="agents-today-bar"></div>
   </div>
 </div>
 
-<!-- ── Aba 4: Agentes ────────────────────────────────────────────── -->
-<div id="panel-agents" class="hidden">
-  <div class="section-header" style="margin-top:14px">
-    <h2 style="font-size:.9rem">🤖 Agentes</h2>
-    <button class="btn-ghost" onclick="loadAgentsToday()">↻ Atualizar</button>
-  </div>
-  <div id="agents-today-bar"></div>
-</div>
-
-<!-- ── Aba 5: Saldo ──────────────────────────────────────────────── -->
+<!-- ── Aba 4: Saldo ────────────────────────────────────────────── -->
 <div id="panel-credits" class="hidden">
   <div class="section-header" style="margin-top:14px">
     <h2 style="font-size:.9rem">⚡ Saldo Anthropic</h2>
     <button class="btn-ghost" onclick="toggleTopupForm()">+ Registrar recarga</button>
   </div>
-
   <div class="credits-card" id="credits-card">
     <div class="credits-left">
       <div class="credits-values">
@@ -139,7 +174,6 @@
     </div>
     <div class="credits-stats" id="credits-stats"></div>
   </div>
-
   <div class="topup-form hidden" id="topup-form">
     <h4>Nova recarga</h4>
     <div class="topup-fields">
@@ -161,12 +195,11 @@
       <button class="btn-ghost" onclick="toggleTopupForm()">Cancelar</button>
     </div>
   </div>
-
   <div id="topup-history"></div>
 </div>
 </main>
 
-<!-- Run detail modal -->
+<!-- ── Modal: detalhes do run ─────────────────────────────────── -->
 <div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal(event)">
   <div class="modal">
     <div class="modal-header">
@@ -192,6 +225,39 @@
     <div class="modal-costs">
       <span>Custo total: <strong id="modal-cost">—</strong></span>
       <span>Duração: <strong id="modal-duration">—</strong></span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: upload de spec ──────────────────────────────────── -->
+<div id="spec-modal-overlay" class="modal-overlay hidden" onclick="closeSpecModal(event)">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <h3>Processar Spec</h3>
+      <button class="btn-ghost" onclick="closeSpecModal()">✕</button>
+    </div>
+    <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+      <div>
+        <label class="field-label">Projeto</label>
+        <select id="spec-project" style="width:100%">
+          <option value="climate">🌦 Climate</option>
+          <option value="grc-flow" selected>📋 GRC Flow</option>
+          <option value="aios">⚡ AIOS</option>
+          <option value="expansao">🚀 Expansão AI</option>
+        </select>
+      </div>
+      <div>
+        <label class="field-label">Arquivo (.md, .txt)</label>
+        <input type="file" id="spec-file-input" accept=".md,.txt,.docx"
+               style="width:100%;padding:8px;background:#0d1117;border:1px solid var(--border);border-radius:6px;color:var(--text)">
+      </div>
+      <div>
+        <label class="field-label">Contexto (opcional)</label>
+        <input type="text" id="spec-context-input" placeholder="Ex: Fase 2 — integração IA"
+               style="width:100%;padding:8px;background:#0d1117;border:1px solid var(--border);border-radius:6px;color:var(--text)">
+      </div>
+      <button class="btn-save" onclick="uploadSpec()">🚀 Processar Spec</button>
+      <p id="spec-status" style="font-size:.8rem;color:var(--muted);text-align:center;min-height:1.2em"></p>
     </div>
   </div>
 </div>

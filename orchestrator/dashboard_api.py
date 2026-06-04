@@ -7,7 +7,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
@@ -161,6 +161,112 @@ def list_sprints(user: str = Depends(_auth)) -> list[str]:
 
 class StoryStatusUpdate(BaseModel):
     status: str  # "deploy_ready" | "dev" | "qa" | etc.
+
+
+## ── Backlog ───────────────────────────────────────────────────────────────────
+
+@router.get("/backlog")
+def get_backlog(project: str | None = None, user: str = Depends(_auth)) -> list[dict]:
+    """Fetch backlog items from Notion, optionally filtered by project."""
+    try:
+        from tools.notion import NotionClient  # noqa: PLC0415
+        notion = NotionClient()
+        # Map dashboard project slug to Notion Project select name
+        project_map = {
+            "climate": "Climate", "grc-flow": "GRC Flow",
+            "aios": "Expansao AIOS", "expansao": "Expansao AIOS",
+        }
+        notion_project = project_map.get(project or "") if project else None
+        items = notion.get_backlog(project=notion_project)
+        return _serialize(items)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class MarkSprintRequest(BaseModel):
+    sprint: str = ""
+
+
+@router.post("/backlog/{notion_id}/sprint")
+async def mark_backlog_for_sprint(notion_id: str, body: MarkSprintRequest,
+                                   user: str = Depends(_auth)) -> dict:
+    """Mark a backlog item as Ready and assign to sprint."""
+    try:
+        from tools.notion import NotionClient  # noqa: PLC0415
+        notion = NotionClient()
+        notion._patch(f"/pages/{notion_id}", {
+            "properties": {
+                "Status": {"select": {"name": "Ready"}},
+                "Sprint": {"rich_text": [{"text": {"content": body.sprint}}]},
+            }
+        })
+        await broadcast({"type": "backlog_update", "notion_id": notion_id})
+        return {"ok": True, "notion_id": notion_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+## ── Run trigger ───────────────────────────────────────────────────────────────
+
+class TriggerRunRequest(BaseModel):
+    project: str = "expansao"
+    start_from: str = "ceo"
+    context: str = ""
+    pipeline: str = "expansao"
+
+
+@router.post("/runs/trigger")
+async def trigger_run(body: TriggerRunRequest, user: str = Depends(_auth)) -> dict:
+    """Trigger a pipeline run from the dashboard."""
+    import threading  # noqa: PLC0415
+    def _do() -> None:
+        try:
+            from orchestrator.pipeline import run_pipeline  # noqa: PLC0415
+            run_pipeline(extra_context=body.context, start_from=body.start_from,
+                         project=body.project if body.project not in ("expansao",) else None)
+        except Exception as e:
+            import logging  # noqa: PLC0415
+            logging.getLogger("aios.dashboard").error(f"trigger_run failed: {e}", exc_info=True)
+    threading.Thread(target=_do, daemon=True).start()
+    return {"triggered": True, "project": body.project, "start_from": body.start_from}
+
+
+## ── Spec upload ───────────────────────────────────────────────────────────────
+
+@router.post("/spec/upload")
+async def upload_spec(
+    file: UploadFile = File(...),
+    project: str = Form("grc-flow"),
+    context: str = Form(""),
+    user: str = Depends(_auth),
+) -> dict:
+    """Upload a spec document and trigger the Spec→PM→Arch→Dev→QA pipeline."""
+    import tempfile, os, threading  # noqa: PLC0415
+    from pathlib import Path  # noqa: PLC0415
+
+    suffix = Path(file.filename or "spec.md").suffix or ".md"
+    content = await file.read()
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix,
+                                     prefix="aios_spec_", mode="wb") as tmp:
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    def _do() -> None:
+        try:
+            from orchestrator.pipeline import run_pipeline_from_spec  # noqa: PLC0415
+            run_pipeline_from_spec(input_file=tmp_path, project=project,
+                                   extra_context=context or file.filename)
+        except Exception as e:
+            import logging  # noqa: PLC0415
+            logging.getLogger("aios.dashboard").error(f"upload_spec pipeline failed: {e}", exc_info=True)
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+    threading.Thread(target=_do, daemon=True).start()
+    return {"triggered": True, "filename": file.filename, "project": project}
 
 
 @router.get("/gates/pending")
