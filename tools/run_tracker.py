@@ -352,24 +352,29 @@ def upsert_story(sprint: str, story_id: str, title: str = "", project: str = "",
         return
     try:
         with c.cursor() as cur:
+            # project: INSERT uses fallback 'expansao' when empty;
+            # UPDATE only overwrites when a non-empty project is explicitly passed.
+            # This ensures the Project→Epic→Story hierarchy is never silently broken
+            # by downstream agents (Dev, QA, dashboard) that only know the story_id.
             cur.execute("""
                 INSERT INTO pipeline_stories
                     (sprint, story_id, title, project, epic_id, epic_title, prd_title,
                      status, dev_files, qa_result, qa_notes, updated_at)
                 VALUES (%s, %s, %s, COALESCE(NULLIF(%s,''),'expansao'), %s, %s, %s, %s, %s, %s, %s, NOW())
                 ON CONFLICT (sprint, story_id) DO UPDATE SET
-                    title       = CASE WHEN EXCLUDED.title       != '' THEN EXCLUDED.title       ELSE pipeline_stories.title END,
-                    project     = CASE WHEN EXCLUDED.project NOT IN ('','expansao') THEN EXCLUDED.project ELSE pipeline_stories.project END,
-                    epic_id     = CASE WHEN EXCLUDED.epic_id     != '' THEN EXCLUDED.epic_id     ELSE pipeline_stories.epic_id END,
-                    epic_title  = CASE WHEN EXCLUDED.epic_title  != '' THEN EXCLUDED.epic_title  ELSE pipeline_stories.epic_title END,
-                    prd_title   = CASE WHEN EXCLUDED.prd_title   != '' THEN EXCLUDED.prd_title   ELSE pipeline_stories.prd_title END,
-                    status      = CASE WHEN EXCLUDED.status      != 'backlog' THEN EXCLUDED.status ELSE pipeline_stories.status END,
-                    dev_files   = CASE WHEN EXCLUDED.dev_files   != 0    THEN EXCLUDED.dev_files   ELSE pipeline_stories.dev_files END,
-                    qa_result   = CASE WHEN EXCLUDED.qa_result   != '' THEN EXCLUDED.qa_result   ELSE pipeline_stories.qa_result END,
-                    qa_notes    = CASE WHEN EXCLUDED.qa_notes    != '' THEN EXCLUDED.qa_notes    ELSE pipeline_stories.qa_notes END,
+                    title       = CASE WHEN EXCLUDED.title      != '' THEN EXCLUDED.title      ELSE pipeline_stories.title END,
+                    project     = CASE WHEN %s                  != '' THEN %s                  ELSE pipeline_stories.project END,
+                    epic_id     = CASE WHEN EXCLUDED.epic_id    != '' THEN EXCLUDED.epic_id    ELSE pipeline_stories.epic_id END,
+                    epic_title  = CASE WHEN EXCLUDED.epic_title != '' THEN EXCLUDED.epic_title ELSE pipeline_stories.epic_title END,
+                    prd_title   = CASE WHEN EXCLUDED.prd_title  != '' THEN EXCLUDED.prd_title  ELSE pipeline_stories.prd_title END,
+                    status      = CASE WHEN EXCLUDED.status     != 'backlog' THEN EXCLUDED.status ELSE pipeline_stories.status END,
+                    dev_files   = CASE WHEN EXCLUDED.dev_files  != 0   THEN EXCLUDED.dev_files  ELSE pipeline_stories.dev_files END,
+                    qa_result   = CASE WHEN EXCLUDED.qa_result  != '' THEN EXCLUDED.qa_result  ELSE pipeline_stories.qa_result END,
+                    qa_notes    = CASE WHEN EXCLUDED.qa_notes   != '' THEN EXCLUDED.qa_notes   ELSE pipeline_stories.qa_notes END,
                     updated_at  = NOW()
             """, (sprint, story_id, title, project, epic_id, epic_title, prd_title,
-                  status, dev_files, qa_result, qa_notes))
+                  status, dev_files, qa_result, qa_notes,
+                  project, project))
         c.commit()
         try:
             from orchestrator.dashboard_api import emit_event  # noqa: PLC0415
