@@ -244,6 +244,7 @@ Inclua o JSON de output ao final da sua resposta.
             "climate":  settings.coolify_uuid_climate,
             "grc-flow": settings.coolify_uuid_grc_flow,
             "cwi":      settings.coolify_uuid_cwi,
+            "site":     settings.coolify_uuid_site,
         }
         raw = mapping.get(project, "")
         return [u.strip() for u in raw.split(",") if u.strip()]

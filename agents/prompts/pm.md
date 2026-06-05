@@ -134,14 +134,14 @@ Se o backlog item não tiver stories ainda, aí sim você pode propô-las — ma
     {
       "notion_id": "string",
       "title": "string",
-      "epic_id": "string (ex: CLIMA-043, AIOS-001)",
-      "project": "climate|aios|grc-flow|expansao|cwi",
+      "epic_id": "string (ex: CLIMA-043, AIOS-001, SITE-001)",
+      "project": "climate|aios|grc-flow|expansao|cwi|site",
       "backlog_item_id": "string",
       "stories": [
         {
-          "id": "PROJ-US-001 (prefixe com projeto: GRC-US-001, CLIMA-US-001, AIOS-US-001)",
+          "id": "PROJ-US-001 (prefixe com projeto: GRC-US-001, CLIMA-US-001, AIOS-US-001, SITE-US-001)",
           "title": "string",
-          "project": "climate|aios|grc-flow|expansao|cwi",
+          "project": "climate|aios|grc-flow|expansao|cwi|site",
           "as_a": "string",
           "i_want": "string",
           "so_that": "string",

@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     coolify_uuid_climate: str = ""
     coolify_uuid_grc_flow: str = ""
     coolify_uuid_cwi: str = ""
+    coolify_uuid_site: str = ""
 
     # N8N workflow IDs (pre-configured)
     n8n_deploy_webhook: str = "deploy"  # webhook path suffix

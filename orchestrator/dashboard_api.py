@@ -175,6 +175,7 @@ def get_backlog(project: str | None = None, user: str = Depends(_auth)) -> list[
         project_map = {
             "climate": "Climate", "grc-flow": "GRC Flow",
             "aios": "Expansao AIOS", "expansao": "Expansao AIOS",
+            "site": "Site",
         }
         notion_project = project_map.get(project or "") if project else None
         items = notion.get_backlog(project=notion_project)
