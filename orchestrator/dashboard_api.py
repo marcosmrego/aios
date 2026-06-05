@@ -133,6 +133,12 @@ def get_costs(user: str = Depends(_auth)) -> dict:
     return {"runs": runs_summary, "agents": agent_summary}
 
 
+@router.get("/projects")
+def list_projects() -> list[dict]:
+    from tools.project_registry import get_projects  # noqa: PLC0415
+    return get_projects()
+
+
 @router.get("/stories")
 def list_stories(sprint: str | None = None, project: str | None = None,
                  user: str = Depends(_auth)) -> list[dict]:
@@ -172,12 +178,8 @@ def get_backlog(project: str | None = None, user: str = Depends(_auth)) -> list[
         from tools.notion import NotionClient  # noqa: PLC0415
         notion = NotionClient()
         # Map dashboard project slug to Notion Project select name
-        project_map = {
-            "climate": "Climate", "grc-flow": "GRC Flow",
-            "aios": "Expansao AIOS", "expansao": "Expansao AIOS",
-            "site": "Site",
-        }
-        notion_project = project_map.get(project or "") if project else None
+        from tools.project_registry import get_notion_name  # noqa: PLC0415
+        notion_project = get_notion_name(project) if project else None
         items = notion.get_backlog(project=notion_project)
         return _serialize(items)
     except Exception as e:

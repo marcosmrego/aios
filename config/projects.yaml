@@ -1,0 +1,42 @@
+projects:
+  - slug: climate
+    name: Climate
+    display: "🌦 Climate"
+    description: "Monitoramento climático — Python/FastAPI"
+    notion_name: Climate
+    coolify_uuid: "ot129ybxz82dslm0g0zkww3h"
+
+  - slug: grc-flow
+    name: GRC Flow
+    display: "📋 GRC Flow"
+    description: "Governança e compliance — TypeScript/Node"
+    notion_name: GRC Flow
+    coolify_uuid: "jcxdguab32d5kz8mqu8ezbj8"
+
+  - slug: aios
+    name: AIOS
+    display: "⚡ AIOS"
+    description: "Orquestrador multi-agente — Python/FastAPI"
+    notion_name: Expansao AIOS
+    coolify_uuid: "nuq78y0fxb3toq3kdun7rb3u,soox30s56xbhg0794ncwgkj4"
+
+  - slug: site
+    name: Site
+    display: "🌐 Site"
+    description: "Site institucional — Next.js 16 + React 19 + TypeScript + Tailwind"
+    notion_name: Site
+    coolify_uuid: "vihg3imjp39ckmr9o43ak6u2"
+
+  - slug: cwi
+    name: CWI
+    display: "🏢 CWI"
+    description: "Cliente CWI — PMO, agile coaching e relatórios executivos"
+    notion_name: CWI
+    coolify_uuid: ""
+
+  - slug: expansao
+    name: Expansao AI
+    display: "🚀 Expansão AI"
+    description: "Iniciativas internas da Expansão AI sem projeto específico"
+    notion_name: Expansao AIOS
+    coolify_uuid: ""

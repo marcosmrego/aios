@@ -28,9 +28,37 @@ async function apiFetch(path, opts = {}) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   _initTooltip();
+  await loadProjectSelects();
   await Promise.all([loadCosts(), loadRuns()]);
   loadBacklog();
   connectSSE();
+}
+
+async function loadProjectSelects() {
+  const projects = await apiFetch('/dashboard/projects');
+  if (!projects || !projects.length) return;
+
+  const selectIds = [
+    'backlog-filter-project',
+    'filter-story-project',
+    'kanban-filter-project',
+    'filter-project',
+  ];
+  // Selects that also need the "expansao" option (pipeline runs)
+  const withExpansao = new Set(['kanban-filter-project', 'filter-project']);
+
+  for (const id of selectIds) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    const extra = withExpansao.has(id)
+      ? `<option value="expansao">🚀 Expansão AI</option>` : '';
+    el.innerHTML = `<option value="">Todos os projetos</option>` +
+      projects
+        .filter(p => p.slug !== 'expansao')
+        .map(p => `<option value="${p.slug}">${p.display}</option>`)
+        .join('') +
+      extra;
+  }
 }
 
 // ── Agents today ──────────────────────────────────────────────────────────────

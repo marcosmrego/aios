@@ -69,10 +69,6 @@
     <div style="display:flex;gap:10px;align-items:center">
       <select id="backlog-filter-project" onchange="loadBacklog()">
         <option value="">Todos os projetos</option>
-        <option value="climate">🌦 Climate</option>
-        <option value="grc-flow">📋 GRC Flow</option>
-        <option value="aios">⚡ AIOS</option>
-        <option value="site">🌐 Site</option>
       </select>
       <button class="btn-ghost" onclick="loadBacklog()">↻ Atualizar</button>
     </div>
@@ -85,11 +81,6 @@
   <div class="stories-filters">
     <select id="filter-story-project" onchange="onStoryFilterChange()">
       <option value="">Todos os projetos</option>
-      <option value="climate">🌦 Climate</option>
-      <option value="grc-flow">📋 GRC Flow</option>
-      <option value="aios">⚡ AIOS</option>
-      <option value="cwi">🏢 CWI</option>
-      <option value="site">🌐 Site</option>
     </select>
     <select id="filter-story-epic" onchange="loadStories()">
       <option value="">Todos os épicos</option>
@@ -117,12 +108,6 @@
       <div style="display:flex;gap:10px">
         <select id="kanban-filter-project" onchange="renderKanban()">
           <option value="">Todos os projetos</option>
-          <option value="climate">🌦 Climate</option>
-          <option value="grc-flow">📋 GRC Flow</option>
-          <option value="aios">⚡ AIOS</option>
-          <option value="cwi">🏢 CWI</option>
-          <option value="expansao">🚀 Expansão AI</option>
-          <option value="site">🌐 Site</option>
         </select>
         <select id="kanban-filter-sprint" onchange="renderKanban()">
           <option value="">Todos os sprints</option>
@@ -138,12 +123,6 @@
       <h2 style="font-size:.9rem">Histórico de execuções</h2>
       <select id="filter-project" onchange="renderRuns()">
         <option value="">Todos os projetos</option>
-        <option value="climate">🌦 Climate</option>
-        <option value="grc-flow">📋 GRC Flow</option>
-        <option value="aios">⚡ AIOS</option>
-        <option value="cwi">🏢 CWI</option>
-        <option value="expansao">🚀 Expansão AI</option>
-        <option value="site">🌐 Site</option>
       </select>
     </div>
     <div id="runs-list" class="runs-list"><p class="empty-state">Carregando...</p></div>

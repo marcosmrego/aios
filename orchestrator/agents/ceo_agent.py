@@ -54,7 +54,13 @@ class CEOAgent(BaseAgent):
         backlog_text = json.dumps(backlog_items, ensure_ascii=False, indent=2)
 
         # 2. Build prompt
+        from tools.project_registry import projects_context_for_prompt, slug_enum  # noqa: PLC0415
         user_message = f"""
+## Projetos da Expansão AI (fonte: config/projects.yaml)
+{projects_context_for_prompt()}
+
+O campo `project` no output JSON deve ser um dos slugs acima: `{slug_enum()}`
+
 ## Dados do Backlog (Notion)
 ```json
 {backlog_text}

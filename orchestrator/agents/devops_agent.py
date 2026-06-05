@@ -239,15 +239,8 @@ Inclua o JSON de output ao final da sua resposta.
             console.print(f"[{'green' if all_ok else 'red'}]{project}: {len(stories)} stories → {new_status}[/]")
 
     def _project_coolify_uuids(self, project: str) -> list[str]:
-        mapping = {
-            "aios":     settings.coolify_uuid_aios,
-            "climate":  settings.coolify_uuid_climate,
-            "grc-flow": settings.coolify_uuid_grc_flow,
-            "cwi":      settings.coolify_uuid_cwi,
-            "site":     settings.coolify_uuid_site,
-        }
-        raw = mapping.get(project, "")
-        return [u.strip() for u in raw.split(",") if u.strip()]
+        from tools.project_registry import get_coolify_uuids  # noqa: PLC0415
+        return get_coolify_uuids(project)
 
     def _execute_deploys(self, output: dict[str, Any]) -> dict[str, Any]:
         """Trigger N8N deploy webhook for each planned deploy."""
