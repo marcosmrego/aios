@@ -68,6 +68,53 @@ class CoolifyClient:
         except Exception:
             return False
 
+    def get_deployment_status(self, deployment_uuid: str) -> dict[str, Any]:
+        resp = httpx.get(
+            f"{self.base_url}/api/v1/deployments/{deployment_uuid}",
+            headers=self.headers,
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_deployment_logs(self, deployment_uuid: str) -> str:
+        """Fetch deployment logs. Returns empty string on failure."""
+        try:
+            resp = httpx.get(
+                f"{self.base_url}/api/v1/deployments/{deployment_uuid}/logs",
+                headers=self.headers,
+                timeout=_TIMEOUT,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if isinstance(data, list):
+                return "\n".join(
+                    line.get("output", str(line)) if isinstance(line, dict) else str(line)
+                    for line in data
+                )
+            if isinstance(data, dict):
+                return data.get("logs", str(data))
+            return str(data)
+        except Exception:
+            return ""
+
+    def wait_for_deploy(self, deployment_uuid: str, timeout: int = 300,
+                        poll_interval: int = 15) -> str:
+        """Poll until deploy finishes. Returns: 'finished', 'failed', 'cancelled', or 'timeout'."""
+        import time  # noqa: PLC0415
+        terminal = {"finished", "failed", "cancelled", "error"}
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                data = self.get_deployment_status(deployment_uuid)
+                status = data.get("status", "")
+                if status in terminal:
+                    return status
+            except Exception:
+                pass
+            time.sleep(poll_interval)
+        return "timeout"
+
     def trigger_deploy(self, app_uuid: str) -> dict[str, Any]:
         """Trigger a deploy and return the deployment info."""
         return self.deploy_application(app_uuid)

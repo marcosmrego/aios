@@ -149,8 +149,13 @@ Inclua o JSON de output ao final da sua resposta.
 
     def run_deploy_queue(self, by_project: dict[str, list]) -> None:
         """Deploy all queued stories grouped by project. Called by /deploy-queue/execute."""
-        from tools.run_tracker import upsert_story  # noqa: PLC0415
+        from datetime import datetime, timezone  # noqa: PLC0415
+        from tools.run_tracker import upsert_story, save_deploy_log  # noqa: PLC0415
+        from tools.coolify import CoolifyClient  # noqa: PLC0415
+        import httpx  # noqa: PLC0415
+
         console.rule("[bold]DevOps Agent — Deploy Queue")
+        coolify = CoolifyClient()
 
         for project, stories in by_project.items():
             console.print(f"[blue]Deploying {len(stories)} stories for project '{project}'...[/]")
@@ -158,29 +163,72 @@ Inclua o JSON de output ao final da sua resposta.
             all_ok = True
 
             if uuids:
-                try:
-                    from tools.coolify import CoolifyClient  # noqa: PLC0415
-                    coolify = CoolifyClient()
-                    for uuid in uuids:
-                        import httpx  # noqa: PLC0415
+                for app_uuid in uuids:
+                    deployment_uuid = ""
+                    deploy_status = "error"
+                    logs = ""
+                    error_msg = ""
+                    health_ok = False
+
+                    try:
+                        base = settings.coolify_base_url.rstrip("/")
                         headers = {
                             "Authorization": f"Bearer {settings.coolify_api_key}",
                             "Content-Type": "application/json",
                         }
-                        base = settings.coolify_base_url.rstrip("/")
-                        r = httpx.post(f"{base}/api/v1/deploy?uuid={uuid}&force=false",
+                        r = httpx.post(f"{base}/api/v1/deploy?uuid={app_uuid}&force=false",
                                        headers=headers, timeout=30)
                         r.raise_for_status()
-                        console.print(f"[green]  Deploy triggered: {uuid[:12]}[/]")
-                        healthy = coolify.health_check_by_id(uuid)
-                        if not healthy:
+                        data = r.json()
+                        deployment_uuid = (data.get("deployments") or [{}])[0].get("deployment_uuid", "")
+                        console.print(f"[green]  Triggered: {app_uuid[:12]} → deployment {deployment_uuid[:12] or '?'}[/]")
+
+                        if deployment_uuid:
+                            deploy_status = coolify.wait_for_deploy(deployment_uuid, timeout=300, poll_interval=15)
+                            logs = coolify.get_deployment_logs(deployment_uuid)
+                        else:
+                            # Coolify didn't return a deployment_uuid — fallback to app status polling
+                            import time  # noqa: PLC0415
+                            time.sleep(30)
+                            deploy_status = "finished" if coolify.health_check_by_id(app_uuid) else "failed"
+
+                        health_ok = deploy_status == "finished"
+                        if not health_ok:
                             all_ok = False
-                            console.print(f"[red]  Health check failed: {uuid[:12]}[/]")
-                except Exception as exc:
-                    all_ok = False
-                    console.print(f"[red]Deploy error for {project}: {exc}[/]")
+                            console.print(f"[red]  Deploy {deploy_status}: {app_uuid[:12]}[/]")
+                        else:
+                            console.print(f"[green]  Deploy healthy: {app_uuid[:12]}[/]")
+
+                    except Exception as exc:
+                        all_ok = False
+                        error_msg = str(exc)
+                        console.print(f"[red]  Deploy error for {project}/{app_uuid[:12]}: {exc}[/]")
+
+                    completed = datetime.now(timezone.utc) if deploy_status != "triggered" else None
+                    for story in stories:
+                        save_deploy_log(
+                            story_id=story["story_id"],
+                            sprint=story["sprint"],
+                            project=project,
+                            coolify_app_uuid=app_uuid,
+                            coolify_deployment_uuid=deployment_uuid,
+                            status=deploy_status,
+                            health_ok=health_ok,
+                            logs=logs,
+                            error_msg=error_msg,
+                            completed_at=completed,
+                        )
             else:
-                console.print(f"[yellow]  No Coolify UUID configured for '{project}' — marking as deployed (manual confirm needed)[/]")
+                console.print(f"[yellow]  No Coolify UUID for '{project}' — marking deployed (manual confirm needed)[/]")
+                for story in stories:
+                    save_deploy_log(
+                        story_id=story["story_id"],
+                        sprint=story["sprint"],
+                        project=project,
+                        status="no_uuid",
+                        health_ok=True,
+                        completed_at=datetime.now(timezone.utc),
+                    )
 
             new_status = "deployed" if all_ok else "deploy_failed"
             for story in stories:

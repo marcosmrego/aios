@@ -37,6 +37,23 @@ DO $$ BEGIN
 END $$;
 """
 
+_CREATE_DEPLOY_LOGS_SQL = """
+CREATE TABLE IF NOT EXISTS deploy_logs (
+    id                       SERIAL PRIMARY KEY,
+    story_id                 VARCHAR(20)  NOT NULL,
+    sprint                   VARCHAR(20)  NOT NULL,
+    project                  VARCHAR(50)  NOT NULL,
+    coolify_app_uuid         VARCHAR(100) DEFAULT '',
+    coolify_deployment_uuid  VARCHAR(100) DEFAULT '',
+    status                   VARCHAR(30)  NOT NULL DEFAULT 'triggered',
+    health_ok                BOOLEAN      DEFAULT FALSE,
+    logs                     TEXT         DEFAULT '',
+    error_msg                TEXT         DEFAULT '',
+    triggered_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    completed_at             TIMESTAMPTZ
+);
+"""
+
 _CREATE_CREDITS_SQL = """
 CREATE TABLE IF NOT EXISTS credit_topups (
     id          SERIAL PRIMARY KEY,
@@ -110,6 +127,7 @@ def _conn():
         cur.execute(_CREATE_SQL)
         cur.execute(_CREATE_CREDITS_SQL)
         cur.execute(_CREATE_STORIES_SQL)
+        cur.execute(_CREATE_DEPLOY_LOGS_SQL)
     c.commit()
     return c
 
@@ -451,6 +469,31 @@ def sync_epic_notion_status(sprint: str, epic_id: str) -> None:
         notion._patch(f"/pages/{notion_id}", {"properties": {"Status": {"select": {"name": notion_status}}}})
     except Exception:
         pass
+
+
+def save_deploy_log(story_id: str, sprint: str, project: str,
+                    coolify_app_uuid: str = "", coolify_deployment_uuid: str = "",
+                    status: str = "triggered", health_ok: bool = False,
+                    logs: str = "", error_msg: str = "",
+                    completed_at: Any = None) -> None:
+    """Persist a Coolify deployment record linked to a story."""
+    c = _conn()
+    if not c:
+        return
+    try:
+        with c.cursor() as cur:
+            cur.execute("""
+                INSERT INTO deploy_logs
+                    (story_id, sprint, project, coolify_app_uuid, coolify_deployment_uuid,
+                     status, health_ok, logs, error_msg, completed_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (story_id, sprint, project, coolify_app_uuid, coolify_deployment_uuid,
+                  status, health_ok, logs[:10000], error_msg[:2000], completed_at))
+        c.commit()
+    except Exception:
+        pass
+    finally:
+        c.close()
 
 
 def get_deploy_ready_stories() -> dict[str, list[dict]]:
