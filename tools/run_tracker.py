@@ -496,6 +496,25 @@ def save_deploy_log(story_id: str, sprint: str, project: str,
         c.close()
 
 
+def get_deploy_logs(sprint: str, story_id: str) -> list[dict]:
+    """Return all deploy log entries for a given story, newest first."""
+    c = _conn()
+    if not c:
+        return []
+    try:
+        import psycopg2.extras  # noqa: PLC0415
+        with c.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT * FROM deploy_logs WHERE sprint=%s AND story_id=%s ORDER BY triggered_at DESC",
+                (sprint, story_id),
+            )
+            return [dict(r) for r in cur.fetchall()]
+    except Exception:
+        return []
+    finally:
+        c.close()
+
+
 def get_deploy_ready_stories() -> dict[str, list[dict]]:
     """Return deploy_ready stories grouped by project. Used by deploy queue at 22:00."""
     c = _conn()

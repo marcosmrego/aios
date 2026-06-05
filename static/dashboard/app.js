@@ -742,6 +742,7 @@ const STORY_COLS = [
   { key: 'qa_approved',   label: '✅ QA Aprovado',      cls: 'done-col' },
   { key: 'qa_rejected',   label: '❌ QA Reprovado',     cls: 'has-failed' },
   { key: 'deploy_ready',  label: '🚀 Fila de Deploy',   cls: 'active' },
+  { key: 'deploy_failed', label: '💥 Deploy Falhou',    cls: 'has-failed' },
   { key: 'deployed',      label: '🟢 Deployed',         cls: '' },
   { key: 'done',          label: '🏁 Concluído',        cls: 'done-col' },
 ];
@@ -861,7 +862,8 @@ const _tt = { el: null };
 const STATUS_LABELS = {
   backlog: 'Backlog', dev: 'Em desenvolvimento', qa: 'Em QA',
   qa_approved: 'QA Aprovado', qa_rejected: 'QA Reprovado',
-  deploy_ready: 'Fila de Deploy', deployed: 'Deploy realizado', done: 'Concluído'
+  deploy_ready: 'Fila de Deploy', deploy_failed: 'Deploy Falhou',
+  deployed: 'Deploy realizado', done: 'Concluído'
 };
 
 function _initTooltip() {
@@ -943,7 +945,8 @@ function storyCard(s) {
   const statusCls = {
     backlog: '', dev: 'running', qa: 'running',
     qa_approved: 'completed', qa_rejected: 'failed',
-    deploy_ready: 'running', deployed: 'completed', done: 'completed'
+    deploy_ready: 'running', deploy_failed: 'failed',
+    deployed: 'completed', done: 'completed'
   }[s.status] || '';
 
   const epicBadge  = s.epic_id  ? `<div class="kb-card-sprint">${s.epic_id}</div>` : '';
@@ -954,6 +957,13 @@ function storyCard(s) {
     actionBtn = `<button class="story-action-btn deploy" onclick="event.stopPropagation();moveStory('${s.sprint}','${s.story_id}','deploy_ready')">🚀 Fila de Deploy</button>`;
   } else if (s.status === 'qa_rejected') {
     actionBtn = `<button class="story-action-btn dev" onclick="event.stopPropagation();moveStory('${s.sprint}','${s.story_id}','dev')">🔧 Voltar ao Dev</button>`;
+  } else if (s.status === 'deploy_failed') {
+    actionBtn = `
+      <div class="story-action-group">
+        <button class="story-action-btn deploy" onclick="event.stopPropagation();moveStory('${s.sprint}','${s.story_id}','deploy_ready')" title="Colocar de volta na fila — tenta de novo às 22h">🔁 Retry</button>
+        <button class="story-action-btn dev"    onclick="event.stopPropagation();moveStory('${s.sprint}','${s.story_id}','dev')"          title="Volta para desenvolvimento">🔧 Dev</button>
+        <button class="story-action-btn logs"   onclick="event.stopPropagation();showDeployLogs('${s.sprint}','${s.story_id}')"           title="Ver logs do deploy">📋 Logs</button>
+      </div>`;
   } else if (s.status === 'deployed') {
     actionBtn = `<button class="story-action-btn done" onclick="event.stopPropagation();moveStory('${s.sprint}','${s.story_id}','done')">✅ Concluído</button>`;
   }
@@ -974,7 +984,52 @@ async function moveStory(sprint, storyId, status) {
     method: 'POST',
     body: JSON.stringify({ status }),
   });
-  loadStories(); // atualiza imediatamente, SSE também vai disparar
+  loadStories();
+}
+
+async function showDeployLogs(sprint, storyId) {
+  const overlay = document.getElementById('deploy-logs-overlay');
+  const titleEl = document.getElementById('deploy-logs-title');
+  const bodyEl  = document.getElementById('deploy-logs-body');
+  titleEl.textContent = `Logs de deploy — ${storyId}`;
+  bodyEl.textContent  = 'Carregando…';
+  overlay.classList.remove('hidden');
+
+  try {
+    const logs = await apiFetch(`/dashboard/stories/${sprint}/${storyId}/deploy-logs`);
+    if (!logs || logs.length === 0) {
+      bodyEl.textContent = 'Nenhum registro de deploy encontrado.';
+      return;
+    }
+    bodyEl.innerHTML = logs.map(l => {
+      const ok   = l.health_ok ? '✅' : '❌';
+      const when = l.triggered_at ? new Date(l.triggered_at).toLocaleString('pt-BR') : '—';
+      const uuid = l.coolify_deployment_uuid ? `<span class="log-uuid">${l.coolify_deployment_uuid.slice(0,12)}…</span>` : '';
+      const logsBlock = l.logs
+        ? `<pre class="deploy-log-pre">${_escHtml(l.logs)}</pre>`
+        : '';
+      const errBlock = l.error_msg
+        ? `<div class="deploy-log-err">Erro: ${_escHtml(l.error_msg)}</div>`
+        : '';
+      return `
+        <div class="deploy-log-entry">
+          <div class="deploy-log-header">${ok} ${when} — status: <strong>${l.status}</strong> ${uuid}</div>
+          ${errBlock}${logsBlock}
+        </div>`;
+    }).join('');
+  } catch (e) {
+    bodyEl.textContent = `Erro ao carregar logs: ${e}`;
+  }
+}
+
+function closeDeployLogs(e) {
+  if (!e || e.target === document.getElementById('deploy-logs-overlay')) {
+    document.getElementById('deploy-logs-overlay').classList.add('hidden');
+  }
+}
+
+function _escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────────

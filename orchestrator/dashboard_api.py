@@ -303,11 +303,17 @@ def pending_gates(sprint: str | None = None, project: str | None = None,
         c.close()
 
 
+@router.get("/stories/{sprint}/{story_id}/deploy-logs")
+def get_story_deploy_logs(sprint: str, story_id: str, user: str = Depends(_auth)) -> list[dict]:
+    from tools.run_tracker import get_deploy_logs  # noqa: PLC0415
+    return _serialize(get_deploy_logs(sprint=sprint, story_id=story_id))
+
+
 @router.post("/stories/{sprint}/{story_id}/status")
 async def update_story_status(sprint: str, story_id: str, body: StoryStatusUpdate,
                                user: str = Depends(_auth)) -> dict:
     from tools.run_tracker import upsert_story  # noqa: PLC0415
-    allowed = {"deploy_ready", "dev", "qa", "qa_approved", "qa_rejected", "deployed", "done"}
+    allowed = {"deploy_ready", "deploy_failed", "dev", "qa", "qa_approved", "qa_rejected", "deployed", "done"}
     if body.status not in allowed:
         raise HTTPException(status_code=400, detail=f"status inválido: {body.status}")
     upsert_story(sprint=sprint, story_id=story_id, status=body.status)

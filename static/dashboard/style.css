@@ -298,9 +298,19 @@ main { max-width: 1100px; margin: 0 auto; padding: 16px 24px 24px; display: flex
 /* Story action buttons */
 .story-action-btn { display: block; width: 100%; margin-top: 6px; padding: 4px 0; border: none; border-radius: 5px; font-size: .75rem; font-weight: 600; cursor: pointer; transition: opacity .15s; }
 .story-action-btn:hover { opacity: .85; }
-.story-action-btn.deploy { background: rgba(63,185,80,.18);  color: var(--green);  border: 1px solid rgba(63,185,80,.35); }
-.story-action-btn.dev    { background: rgba(88,166,255,.15); color: var(--blue);   border: 1px solid rgba(88,166,255,.3); }
-.story-action-btn.done   { background: rgba(188,140,255,.15);color: var(--purple); border: 1px solid rgba(188,140,255,.3); }
+.story-action-btn.deploy { background: rgba(63,185,80,.18);   color: var(--green);  border: 1px solid rgba(63,185,80,.35); }
+.story-action-btn.dev    { background: rgba(88,166,255,.15);  color: var(--blue);   border: 1px solid rgba(88,166,255,.3); }
+.story-action-btn.done   { background: rgba(188,140,255,.15); color: var(--purple); border: 1px solid rgba(188,140,255,.3); }
+.story-action-btn.logs   { background: rgba(210,153,34,.15);  color: var(--yellow); border: 1px solid rgba(210,153,34,.3); }
+.story-action-group { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.story-action-group .story-action-btn { margin-top: 0; }
+
+/* Deploy logs modal */
+.deploy-log-entry  { border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin-bottom: 10px; background: rgba(255,255,255,.03); }
+.deploy-log-header { font-weight: 600; margin-bottom: 6px; color: var(--fg); }
+.log-uuid          { font-family: monospace; font-size: .75rem; color: var(--muted); margin-left: 6px; }
+.deploy-log-err    { color: var(--red); font-size: .8rem; margin-bottom: 6px; }
+.deploy-log-pre    { font-family: monospace; font-size: .73rem; white-space: pre-wrap; word-break: break-all; color: var(--muted); background: rgba(0,0,0,.25); border-radius: 4px; padding: 8px; max-height: 300px; overflow-y: auto; margin: 0; }
 
 .gates-section { padding: 0 24px 16px; }
 .gates-section h4 { font-size: .85rem; color: var(--muted); margin-bottom: 10px; }
