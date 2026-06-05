@@ -247,6 +247,14 @@ def run_pipeline_from_spec(input_file: str, project: str = "grc-flow", extra_con
     architect_output = ArchitectAgent().run(pm_output=pm_output)
     _stage_done(_current_run_id, "architect", architect_output)
 
+    # Gate arch→dev: review architect output before generating code
+    arch_summary = f"Architect gerou {len(architect_output.get('architectures', []))} arquitetura(s). Aprovar para iniciar Dev Agent?"
+    arch_approved = _await_gate(_current_run_id, "arch->dev", arch_summary)
+    if not arch_approved:
+        console.print("[red bold]Pipeline stopped at Arch->Dev gate.[/]")
+        update_run(_current_run_id, "paused", error_msg="Gate Arch->Dev aguardando aprovação")
+        return
+
     start_stage(_current_run_id, "dev")
     emit_event({"type": "stage_update", "run_id": _current_run_id, "stage": "dev", "status": "running"})
     from orchestrator.agents.dev_agent import DevAgent  # noqa: PLC0415
@@ -284,6 +292,34 @@ def run_pipeline_from_spec(input_file: str, project: str = "grc-flow", extra_con
     update_run(_current_run_id, "completed")
     emit_event({"type": "run_update", "run_id": _current_run_id, "status": "completed"})
     console.rule("[bold green]Pipeline from Spec — Complete[/]")
+
+
+def _await_gate(run_id: str, gate_id: str, summary: str) -> bool:
+    """Register a human gate and block until decided via dashboard or CLI."""
+    import time  # noqa: PLC0415
+    from orchestrator.settings import settings  # noqa: PLC0415
+    if not settings.human_in_the_loop:
+        if settings.database_url:
+            try:
+                from tools.run_tracker import get_gate_decision, set_gate  # noqa: PLC0415
+                set_gate(run_id, gate_id, "pending")
+                emit_event({"type": "gate_pending", "run_id": run_id, "gate_id": gate_id})
+                console.print(f"\n[yellow bold][GATE] Aguardando decisão no dashboard: {gate_id}[/]")
+                console.print(f"[dim]{summary}[/]\n")
+                while True:
+                    decision = get_gate_decision(run_id, gate_id)
+                    if decision != "pending":
+                        approved = decision == "approved"
+                        console.print(f"[{'green' if approved else 'red'}]Gate '{gate_id}': {decision}[/]")
+                        return approved
+                    time.sleep(5)
+            except Exception:
+                pass
+        return True
+    console.print(f"\n[yellow bold][GATE] {gate_id}[/]\n[dim]{summary}[/]\n")
+    from rich.console import Console  # noqa: PLC0415
+    answer = Console(legacy_windows=False).input("[bold]Aprovar? (s/n): [/]").strip().lower()
+    return answer in ("s", "sim", "y", "yes")
 
 
 def _stage_done(run_id: str, stage: str, output: dict, summary: str = "") -> None:
