@@ -1,4 +1,4 @@
-"""YouTube Analytics API — serves metrics from the youtube_analytics Postgres database."""
+"""YouTube Analytics API — serves metrics and triggers daily sync."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from datetime import date, timedelta
 
 import psycopg2
 import psycopg2.extras
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Query
 from fastapi.responses import FileResponse
 
 router = APIRouter(prefix="/youtube", tags=["youtube"])
@@ -117,6 +117,34 @@ def timeseries(days: int = Query(30, ge=1, le=365)):
     except Exception as exc:
         log.error("timeseries error: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/sync")
+def youtube_sync(
+    background_tasks: BackgroundTasks,
+    x_aios_key: str | None = Header(default=None),
+):
+    """Trigger YouTube Analytics sync. Called daily by n8n."""
+    from orchestrator.settings import settings  # noqa: PLC0415
+
+    if settings.track_api_key and x_aios_key != settings.track_api_key:
+        raise HTTPException(status_code=403, detail="Invalid or missing X-AIOS-Key")
+
+    background_tasks.add_task(_do_sync)
+    return {"triggered": True, "message": "Sync iniciado em background"}
+
+
+def _do_sync() -> None:
+    from orchestrator.youtube_sync.sync import run_sync  # noqa: PLC0415
+
+    try:
+        result = run_sync(days_back=2)
+        log.info(
+            "YouTube sync OK | videos=%d metrics=%d period=%s->%s",
+            result.videos, result.metrics_rows, result.period_start, result.period_end,
+        )
+    except Exception as exc:
+        log.error("YouTube sync falhou: %s", exc, exc_info=True)
 
 
 @router.get("/api/videos")
