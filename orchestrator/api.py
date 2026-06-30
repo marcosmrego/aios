@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from orchestrator.dashboard_api import router as dashboard_router, set_loop
+from orchestrator.youtube_api import router as youtube_router
 
 app = FastAPI(
     title="Expansao AI OS",
@@ -24,6 +25,7 @@ app = FastAPI(
 )
 
 app.include_router(dashboard_router)
+app.include_router(youtube_router)
 
 # Serve static dashboard files
 from pathlib import Path as _Path  # noqa: E402

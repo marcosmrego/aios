@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YouTube Analytics — Music Videos</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<link rel="stylesheet" href="/static/youtube/style.css">
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────────── -->
+<header>
+  <div class="header-left">
+    <svg class="yt-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/></svg>
+    <div class="header-brand">
+      <span class="brand-name">YouTube Analytics</span>
+      <span class="brand-sub">Music Videos</span>
+    </div>
+  </div>
+  <div class="header-center">
+    <div class="period-switcher">
+      <button class="period-btn active" data-days="7">7 dias</button>
+      <button class="period-btn" data-days="30">30 dias</button>
+      <button class="period-btn" data-days="90">90 dias</button>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="sync-info">
+      <span class="sync-dot"></span>
+      <span id="last-synced">—</span>
+    </div>
+    <a href="/static/dashboard/index.html" class="btn-ghost">← AIOS</a>
+  </div>
+</header>
+
+<main>
+
+<!-- ── KPI Row ──────────────────────────────────────────────────────── -->
+<div class="kpi-row">
+  <div class="kpi-card">
+    <div class="kpi-icon views-icon">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+    </div>
+    <div class="kpi-data">
+      <div class="kpi-label">Visualizações</div>
+      <div class="kpi-value" id="kpi-views">—</div>
+      <div class="kpi-sub" id="kpi-views-sub"></div>
+    </div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon watch-icon">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
+    </div>
+    <div class="kpi-data">
+      <div class="kpi-label">Horas assistidas</div>
+      <div class="kpi-value" id="kpi-hours">—</div>
+      <div class="kpi-sub" id="kpi-hours-sub"></div>
+    </div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon subs-icon">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+    </div>
+    <div class="kpi-data">
+      <div class="kpi-label">Inscritos ganhos</div>
+      <div class="kpi-value" id="kpi-subs">—</div>
+      <div class="kpi-sub" id="kpi-subs-sub"></div>
+    </div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon duration-icon">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M8 5v14l11-7z"/></svg>
+    </div>
+    <div class="kpi-data">
+      <div class="kpi-label">Duração média</div>
+      <div class="kpi-value" id="kpi-duration">—</div>
+      <div class="kpi-sub" id="kpi-duration-sub"></div>
+    </div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon pct-icon">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14h-2V9h-2V7h4v10z"/></svg>
+    </div>
+    <div class="kpi-data">
+      <div class="kpi-label">% Assistido</div>
+      <div class="kpi-value" id="kpi-pct">—</div>
+      <div class="kpi-sub" id="kpi-pct-sub"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Charts Row ─────────────────────────────────────────────────── -->
+<div class="charts-row">
+  <div class="chart-card chart-wide">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Visualizações diárias</div>
+        <div class="chart-sub">por vídeo</div>
+      </div>
+      <div class="chart-toggle">
+        <button class="toggle-btn active" id="toggle-per-video" onclick="setViewMode('per_video')">Por vídeo</button>
+        <button class="toggle-btn" id="toggle-total" onclick="setViewMode('total')">Total</button>
+      </div>
+    </div>
+    <div id="chart-views" class="chart-plot"></div>
+  </div>
+  <div class="chart-card chart-narrow">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Top vídeos</div>
+        <div class="chart-sub">por visualizações no período</div>
+      </div>
+    </div>
+    <div id="chart-top-videos" class="chart-plot"></div>
+  </div>
+</div>
+
+<!-- ── Watch time chart ─────────────────────────────────────────────── -->
+<div class="chart-card chart-full">
+  <div class="chart-header">
+    <div>
+      <div class="chart-title">Horas assistidas</div>
+      <div class="chart-sub">acumulado diário do canal</div>
+    </div>
+  </div>
+  <div id="chart-hours" class="chart-plot chart-plot-sm"></div>
+</div>
+
+<!-- ── Subscribers chart ──────────────────────────────────────────────── -->
+<div class="chart-card chart-full">
+  <div class="chart-header">
+    <div>
+      <div class="chart-title">Inscritos ganhos por dia</div>
+      <div class="chart-sub">canal Music Videos</div>
+    </div>
+  </div>
+  <div id="chart-subs" class="chart-plot chart-plot-sm"></div>
+</div>
+
+<!-- ── Videos Table ─────────────────────────────────────────────────── -->
+<div class="table-card">
+  <div class="table-header">
+    <div class="chart-title">Todos os vídeos</div>
+    <div class="chart-sub" id="table-period-label"></div>
+  </div>
+  <div class="table-wrap">
+    <table class="videos-table" id="videos-table">
+      <thead>
+        <tr>
+          <th class="sortable" data-col="title" onclick="sortTable('title')">Vídeo <span class="sort-arrow">↕</span></th>
+          <th class="sortable" data-col="total_views" onclick="sortTable('total_views')">Views <span class="sort-arrow">↕</span></th>
+          <th class="sortable" data-col="total_hours" onclick="sortTable('total_hours')">Horas <span class="sort-arrow">↕</span></th>
+          <th class="sortable" data-col="avg_duration_s" onclick="sortTable('avg_duration_s')">Duração Média <span class="sort-arrow">↕</span></th>
+          <th class="sortable" data-col="avg_pct" onclick="sortTable('avg_pct')">% Assistido <span class="sort-arrow">↕</span></th>
+          <th class="sortable" data-col="total_subs" onclick="sortTable('total_subs')">Inscritos <span class="sort-arrow">↕</span></th>
+          <th>Publicado</th>
+        </tr>
+      </thead>
+      <tbody id="videos-tbody">
+        <tr><td colspan="7" class="loading-row">Carregando...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</main>
+
+<script src="/static/youtube/app.js"></script>
+</body>
+</html>
