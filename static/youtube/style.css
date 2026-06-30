@@ -307,3 +307,43 @@ main {
   padding: 48px;
   font-size: .9rem;
 }
+
+/* ── Pagination ───────────────────────────────────────────────────── */
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 14px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pagination-info {
+  font-size: .78rem;
+  color: var(--muted);
+}
+
+.pagination-controls {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.page-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: .8rem;
+  line-height: 1.4;
+  min-width: 32px;
+  text-align: center;
+  transition: all .15s;
+}
+.page-btn:hover:not(:disabled) { border-color: var(--text); color: var(--text); }
+.page-btn.active { background: var(--yt-red); border-color: var(--yt-red); color: #fff; font-weight: 700; }
+.page-btn:disabled { opacity: .35; cursor: default; }

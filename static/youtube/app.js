@@ -7,6 +7,8 @@ let cachedTimeseries = null;
 let cachedVideos = null;
 let sortCol = 'total_views';
 let sortDir = 'desc';
+let currentPage = 1;
+const PAGE_SIZE = 7;
 
 // ── Plotly dark config ─────────────────────────────────────────────
 const PLOTLY_LAYOUT_BASE = {
@@ -206,6 +208,7 @@ async function loadVideos() {
   try {
     const data = await apiFetch(`/youtube/api/videos?days=${currentDays}`);
     cachedVideos = data.videos;
+    currentPage = 1;
     const label = `últimos ${currentDays} dias`;
     document.getElementById('table-period-label').textContent = label;
     renderVideosTable(cachedVideos);
@@ -245,10 +248,13 @@ function renderTopVideosChart(videos) {
 
 function renderVideosTable(videos) {
   const sorted = sortVideos(videos);
+  const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
+  const page = sorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   const maxViews = Math.max(...videos.map(v => v.total_views), 1);
   const maxHours = Math.max(...videos.map(v => v.total_hours), 1);
 
-  const rows = sorted.map(v => `
+  const rows = page.map(v => `
     <tr>
       <td>
         <div class="video-title-cell">
@@ -284,6 +290,7 @@ function renderVideosTable(videos) {
 
   document.getElementById('videos-tbody').innerHTML = rows || '<tr><td colspan="7" class="loading-row">Sem dados para o período</td></tr>';
   updateSortHeaders();
+  renderPagination(totalPages, sorted.length);
 }
 
 function sortTable(col) {
@@ -293,7 +300,15 @@ function sortTable(col) {
     sortCol = col;
     sortDir = 'desc';
   }
+  currentPage = 1;
   if (cachedVideos) renderVideosTable(cachedVideos);
+}
+
+function goToPage(page) {
+  const sorted = sortVideos(cachedVideos);
+  const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
+  currentPage = Math.max(1, Math.min(page, totalPages));
+  renderVideosTable(cachedVideos);
 }
 
 function sortVideos(videos) {
@@ -311,6 +326,34 @@ function updateSortHeaders() {
     th.classList.remove('sort-asc', 'sort-desc');
     if (th.dataset.col === sortCol) th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
   });
+}
+
+function renderPagination(totalPages, totalItems) {
+  let el = document.getElementById('table-pagination');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'table-pagination';
+    el.className = 'table-pagination';
+    document.querySelector('.table-card').appendChild(el);
+  }
+
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+
+  const start = (currentPage - 1) * PAGE_SIZE + 1;
+  const end   = Math.min(currentPage * PAGE_SIZE, totalItems);
+
+  el.innerHTML = `
+    <span class="pagination-info">${start}–${end} de ${totalItems} vídeos</span>
+    <div class="pagination-controls">
+      <button class="page-btn" onclick="goToPage(1)"         ${currentPage === 1            ? 'disabled' : ''}>«</button>
+      <button class="page-btn" onclick="goToPage(${currentPage - 1})" ${currentPage === 1  ? 'disabled' : ''}>‹</button>
+      ${Array.from({ length: totalPages }, (_, i) => i + 1).map(p => `
+        <button class="page-btn ${p === currentPage ? 'active' : ''}" onclick="goToPage(${p})">${p}</button>
+      `).join('')}
+      <button class="page-btn" onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>›</button>
+      <button class="page-btn" onclick="goToPage(${totalPages})"      ${currentPage === totalPages ? 'disabled' : ''}>»</button>
+    </div>
+  `;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────
