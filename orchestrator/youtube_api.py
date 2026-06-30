@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from contextlib import contextmanager
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import psycopg2
 import psycopg2.extras
@@ -13,12 +14,36 @@ from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Query
 from fastapi.responses import FileResponse
 
 router = APIRouter(prefix="/youtube", tags=["youtube"])
+metrics_router = APIRouter(prefix="/api/youtube", tags=["youtube-metrics"])
 log = logging.getLogger(__name__)
 
 _DSN = os.environ.get(
     "YOUTUBE_POSTGRES_DSN",
     "postgresql://postgres:2qS3CODTaQ42mgOYvgb5FKLp8906qTCb94vg5XQKziszz12O8lC6En2GJsW9qQ0q@212.85.22.227:5432/youtube_analytics",
 )
+
+_METRICS_TOKEN = os.environ.get("YOUTUBE_METRICS_TOKEN", "")
+
+
+def _check_token(authorization: str | None, token: str | None) -> None:
+    if not _METRICS_TOKEN:
+        return
+    provided = token or ""
+    if not provided and authorization:
+        provided = authorization.removeprefix("Bearer ").strip()
+    if provided != _METRICS_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+def _parse_duration(iso: str | None) -> int:
+    """Convert ISO 8601 duration (PT2M41S) to total seconds."""
+    if not iso:
+        return 0
+    m = re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
+    if not m:
+        return 0
+    h, mn, s = (int(g or 0) for g in m.groups())
+    return h * 3600 + mn * 60 + s
 
 
 @contextmanager
@@ -182,3 +207,121 @@ def videos(days: int = Query(30, ge=1, le=365)):
     except Exception as exc:
         log.error("videos error: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ── External metrics API (/api/youtube/metrics) ───────────────────────────────
+
+@metrics_router.get("/metrics")
+def external_metrics(
+    days: int = Query(30, ge=1, le=365),
+    token: str | None = Query(default=None),
+    authorization: str | None = Header(default=None),
+):
+    """
+    Structured YouTube metrics for external consumption (e.g. Claude analysis).
+    Auth: Bearer token via Authorization header or ?token= query param.
+    """
+    _check_token(authorization, token)
+
+    window_start = date.today() - timedelta(days=days)
+
+    try:
+        with _conn() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+
+                # Last sync timestamp
+                cur.execute("SELECT MAX(synced_at) AS ts FROM video_metrics")
+                last_sync = cur.fetchone()["ts"]
+
+                # All videos with lifetime totals + duration
+                cur.execute("""
+                    SELECT
+                        v.video_id,
+                        v.title,
+                        LEFT(v.published_at::text, 10)                             AS published_at,
+                        v.duration                                                  AS duration_iso,
+                        COALESCE(SUM(vm.views), 0)                                 AS total_views,
+                        COALESCE(SUM(vm.impressions), 0)                           AS total_impressions,
+                        ROUND(COALESCE(AVG(NULLIF(vm.impression_ctr,0)),0)::numeric,4)
+                                                                                   AS avg_impression_ctr,
+                        ROUND(COALESCE(AVG(NULLIF(vm.average_view_duration,0)),0)::numeric,1)
+                                                                                   AS avg_view_duration,
+                        ROUND(COALESCE(AVG(NULLIF(vm.average_view_percentage,0)),0)::numeric,2)
+                                                                                   AS avg_view_percentage,
+                        COALESCE(SUM(vm.subscribers_gained), 0)                    AS total_subscribers_gained
+                    FROM videos v
+                    LEFT JOIN video_metrics vm ON vm.video_id = v.video_id
+                    GROUP BY v.video_id, v.title, v.published_at, v.duration
+                    ORDER BY v.published_at DESC
+                """)
+                video_rows = cur.fetchall()
+
+                # Daily metrics for the requested window
+                cur.execute("""
+                    SELECT
+                        video_id,
+                        date::text,
+                        views,
+                        impressions,
+                        ROUND(impression_ctr::numeric, 4)           AS impression_ctr,
+                        ROUND(average_view_duration::numeric, 1)    AS average_view_duration_seconds,
+                        ROUND(average_view_percentage::numeric, 2)  AS average_view_percentage,
+                        subscribers_gained
+                    FROM video_metrics
+                    WHERE date >= %s AND date < CURRENT_DATE
+                    ORDER BY video_id, date
+                """, (window_start,))
+                daily_rows = cur.fetchall()
+
+        # Group daily rows by video_id
+        daily_by_video: dict[str, list[dict]] = {}
+        for r in daily_rows:
+            vid = r["video_id"]
+            if vid not in daily_by_video:
+                daily_by_video[vid] = []
+            daily_by_video[vid].append({
+                "date":                          r["date"],
+                "views":                         int(r["views"]),
+                "impressions":                   int(r["impressions"]) if r["impressions"] else None,
+                "impression_ctr":                float(r["impression_ctr"]) if r["impression_ctr"] else None,
+                "average_view_duration_seconds": float(r["average_view_duration_seconds"]),
+                "average_view_percentage":       float(r["average_view_percentage"]),
+                "subscribers_gained":            int(r["subscribers_gained"]),
+            })
+
+        videos_out = []
+        for v in video_rows:
+            videos_out.append({
+                "video_id":        v["video_id"],
+                "title":           v["title"],
+                "published_at":    v["published_at"],
+                "duration_seconds": _parse_duration(v["duration_iso"]),
+                "metrics_total": {
+                    "views":                         int(v["total_views"]),
+                    "impressions":                   int(v["total_impressions"]) or None,
+                    "impression_ctr":                float(v["avg_impression_ctr"]) or None,
+                    "average_view_duration_seconds": float(v["avg_view_duration"]),
+                    "average_view_percentage":       float(v["avg_view_percentage"]),
+                    "subscribers_gained":            int(v["total_subscribers_gained"]),
+                },
+                "metrics_daily": daily_by_video.get(v["video_id"], []),
+            })
+
+        updated_at = (
+            last_sync.astimezone(timezone.utc).isoformat()
+            if last_sync else datetime.now(timezone.utc).isoformat()
+        )
+
+        return {
+            "updated_at":  updated_at,
+            "channel":     "Music Videos",
+            "channel_id":  "UCOV_BLSt1sD76XUVOazPXrg",
+            "window_days": days,
+            "videos":      videos_out,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.error("external_metrics error: %s", exc)
+        raise HTTPException(status_code=500, detail="Erro ao ler métricas")
