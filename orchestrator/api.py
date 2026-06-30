@@ -11,7 +11,7 @@ from typing import Any
 import asyncio
 
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -52,6 +52,13 @@ class RunAgentRequest(BaseModel):
 class PipelineRequest(BaseModel):
     context: str = ""
     start_from: str = ""
+
+
+# ── Root ─────────────────────────────────────────────────────────────────────
+
+@app.get("/")
+def root():
+    return RedirectResponse(url="/youtube/")
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
