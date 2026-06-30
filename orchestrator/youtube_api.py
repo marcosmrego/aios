@@ -241,9 +241,6 @@ def external_metrics(
                         LEFT(v.published_at::text, 10)                             AS published_at,
                         v.duration                                                  AS duration_iso,
                         COALESCE(SUM(vm.views), 0)                                 AS total_views,
-                        COALESCE(SUM(vm.impressions), 0)                           AS total_impressions,
-                        ROUND(COALESCE(AVG(NULLIF(vm.impression_ctr,0)),0)::numeric,4)
-                                                                                   AS avg_impression_ctr,
                         ROUND(COALESCE(AVG(NULLIF(vm.average_view_duration,0)),0)::numeric,1)
                                                                                    AS avg_view_duration,
                         ROUND(COALESCE(AVG(NULLIF(vm.average_view_percentage,0)),0)::numeric,2)
@@ -262,8 +259,6 @@ def external_metrics(
                         video_id,
                         date::text,
                         views,
-                        impressions,
-                        ROUND(impression_ctr::numeric, 4)           AS impression_ctr,
                         ROUND(average_view_duration::numeric, 1)    AS average_view_duration_seconds,
                         ROUND(average_view_percentage::numeric, 2)  AS average_view_percentage,
                         subscribers_gained
@@ -282,8 +277,6 @@ def external_metrics(
             daily_by_video[vid].append({
                 "date":                          r["date"],
                 "views":                         int(r["views"]),
-                "impressions":                   int(r["impressions"]) if r["impressions"] else None,
-                "impression_ctr":                float(r["impression_ctr"]) if r["impression_ctr"] else None,
                 "average_view_duration_seconds": float(r["average_view_duration_seconds"]),
                 "average_view_percentage":       float(r["average_view_percentage"]),
                 "subscribers_gained":            int(r["subscribers_gained"]),
@@ -292,14 +285,12 @@ def external_metrics(
         videos_out = []
         for v in video_rows:
             videos_out.append({
-                "video_id":        v["video_id"],
-                "title":           v["title"],
-                "published_at":    v["published_at"],
+                "video_id":         v["video_id"],
+                "title":            v["title"],
+                "published_at":     v["published_at"],
                 "duration_seconds": _parse_duration(v["duration_iso"]),
                 "metrics_total": {
                     "views":                         int(v["total_views"]),
-                    "impressions":                   int(v["total_impressions"]) or None,
-                    "impression_ctr":                float(v["avg_impression_ctr"]) or None,
                     "average_view_duration_seconds": float(v["avg_view_duration"]),
                     "average_view_percentage":       float(v["avg_view_percentage"]),
                     "subscribers_gained":            int(v["total_subscribers_gained"]),

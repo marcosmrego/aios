@@ -143,8 +143,6 @@ def _query_video(analytics, video_id: str, start: str, end: str) -> list[dict]:
             "average_view_duration":     float(r.get("averageViewDuration") or 0),
             "average_view_percentage":   float(r.get("averageViewPercentage") or 0),
             "subscribers_gained":        int(r.get("subscribersGained") or 0),
-            "impressions":               None,
-            "impression_ctr":            None,
         })
     return rows
 
@@ -184,7 +182,7 @@ def _upsert_metrics(conn, metrics: list[dict]) -> None:
         conn.cursor(),
         """
         INSERT INTO video_metrics (
-            video_id, date, views, impressions, impression_ctr,
+            video_id, date, views,
             average_view_duration, average_view_percentage,
             subscribers_gained, estimated_minutes_watched
         ) VALUES %s
@@ -198,7 +196,7 @@ def _upsert_metrics(conn, metrics: list[dict]) -> None:
         """,
         [
             (
-                m["video_id"], m["date"], m["views"], m["impressions"], m["impression_ctr"],
+                m["video_id"], m["date"], m["views"],
                 m["average_view_duration"], m["average_view_percentage"],
                 m["subscribers_gained"], m["estimated_minutes_watched"],
             )
