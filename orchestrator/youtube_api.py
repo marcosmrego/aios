@@ -17,10 +17,7 @@ router = APIRouter(prefix="/youtube", tags=["youtube"])
 metrics_router = APIRouter(prefix="/api/youtube", tags=["youtube-metrics"])
 log = logging.getLogger(__name__)
 
-_DSN = os.environ.get(
-    "YOUTUBE_POSTGRES_DSN",
-    "postgresql://postgres:2qS3CODTaQ42mgOYvgb5FKLp8906qTCb94vg5XQKziszz12O8lC6En2GJsW9qQ0q@212.85.22.227:5432/youtube_analytics",
-)
+_DSN = os.environ.get("YOUTUBE_POSTGRES_DSN", "")
 
 _METRICS_TOKEN = os.environ.get("YOUTUBE_METRICS_TOKEN", "")
 
@@ -160,10 +157,10 @@ def youtube_sync(
 
 
 def _do_sync() -> None:
-    from orchestrator.youtube_sync.sync import run_sync  # noqa: PLC0415
-
     try:
-        result = run_sync(days_back=2)
+        from orchestrator.youtube_sync.sync import run_sync  # noqa: PLC0415
+
+        result = run_sync(days_back=5)
         log.info(
             "YouTube sync OK | videos=%d metrics=%d period=%s->%s",
             result.videos, result.metrics_rows, result.period_start, result.period_end,

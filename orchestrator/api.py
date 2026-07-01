@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
@@ -16,8 +17,14 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from orchestrator.dashboard_api import router as dashboard_router, set_loop
+from orchestrator.settings import settings
 from orchestrator.youtube_api import metrics_router as youtube_metrics_router
 from orchestrator.youtube_api import router as youtube_router
+
+logging.basicConfig(
+    level=getattr(logging, settings.log_level, logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 app = FastAPI(
     title="Expansao AI OS",

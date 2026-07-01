@@ -207,8 +207,9 @@ def _upsert_metrics(conn, metrics: list[dict]) -> None:
 
 # ── Public entry point ────────────────────────────────────────────────────────
 
-def run_sync(days_back: int = 2) -> SyncResult:
-    """Fetch and persist YouTube metrics. days_back=2 captures stable D-2 data."""
+def run_sync(days_back: int = 5) -> SyncResult:
+    """Fetch and persist YouTube metrics. days_back=5 covers the ~3-day YouTube
+    Analytics reporting lag with margin, so late-arriving days get backfilled."""
     end_date   = date.today() - timedelta(days=1)
     start_date = end_date - timedelta(days=days_back - 1)
 
